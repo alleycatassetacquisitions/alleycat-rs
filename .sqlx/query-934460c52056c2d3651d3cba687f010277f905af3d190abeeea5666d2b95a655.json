@@ -1,11 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT name FROM players",
+  "query": "SELECT name, pdn_code FROM players",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
         "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "pdn_code",
         "type_info": "Text"
       }
     ],
@@ -13,8 +18,9 @@
       "Left": []
     },
     "nullable": [
+      false,
       false
     ]
   },
-  "hash": "d27cdf9711c89596096f6990c272c3490fbcb385434c6419554bbd79749b55e2"
+  "hash": "934460c52056c2d3651d3cba687f010277f905af3d190abeeea5666d2b95a655"
 }

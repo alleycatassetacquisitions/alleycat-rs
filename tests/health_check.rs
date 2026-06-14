@@ -88,12 +88,14 @@ async fn register_player_returns_a_200_for_valid_form_data() {
         .expect("Failed to execute request.");
     // Assert
     assert_eq!(200, response.status().as_u16());
-    let saved = sqlx::query!("SELECT name FROM players",)
+    let saved = sqlx::query!("SELECT name, pdn_code FROM players",)
         .fetch_one(&db_pool)
         .await
         .expect("Failed to fetch saved subscription.");
 
     assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.pdn_code.len(), 4);
+    assert!(saved.pdn_code.chars().all(|c| c.is_ascii_digit()));
 }
 
 #[tokio::test]
