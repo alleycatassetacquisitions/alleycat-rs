@@ -1,6 +1,7 @@
 use actix_web::{HttpResponse, web};
 use chrono::Utc;
 use sqlx::PgPool;
+use tracing::Instrument;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -9,7 +10,11 @@ pub struct FormData {
 }
 
 pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>) -> HttpResponse {
-    log::info!("Registering '{}' as a new player.", form.name);
+    let request_id = Uuid::new_v4();
+    let request_span =
+        tracing::info_span!("Registering a new player", %request_id, player_name = form.name);
+    let _request_span_guard = request_span.enter();
+    let query_span = tracing::info_span!("Adding player to the databse",);
     match sqlx::query!(
         r#"
         WITH picked AS (
@@ -33,20 +38,25 @@ pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>)
         Utc::now()
     )
     .execute(pool.get_ref())
+    .instrument(query_span)
     .await
     {
         Ok(result) => {
             if result.rows_affected() == 0 {
-                log::error!("PDN code pool exhausted");
+                tracing::error!("request_id {} - PDN code pool exhausted", request_id);
                 return HttpResponse::InternalServerError().finish();
             }
 
-            log::info!("New player registered");
+            tracing::info!("request_id {} - New player registered", request_id);
             HttpResponse::Ok().finish()
         }
 
         Err(e) => {
-            log::error!("Failed to execute query: {:?}", e);
+            tracing::error!(
+                "request_id {} - Failed to execute query: {:?}",
+                request_id,
+                e
+            );
             HttpResponse::InternalServerError().finish()
         }
     }
