@@ -1,7 +1,6 @@
 use actix_web::{HttpResponse, web};
 use chrono::Utc;
 use sqlx::PgPool;
-use tracing::Instrument;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -9,13 +8,23 @@ pub struct FormData {
     name: String,
 }
 
+#[tracing::instrument(
+    name = "Registering player",
+    skip(form, pool),
+    fields(
+        name = %form.name
+    )
+)]
 pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>) -> HttpResponse {
-    let request_id = Uuid::new_v4();
-    let request_span =
-        tracing::info_span!("Registering a new player", %request_id, player_name = form.name);
-    let _request_span_guard = request_span.enter();
-    let query_span = tracing::info_span!("Adding player to the databse",);
-    match sqlx::query!(
+    match insert_player(&pool, &form).await {
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+#[tracing::instrument(name = "Adding a player to the database", skip(form, pool))]
+pub async fn insert_player(pool: &PgPool, form: &FormData) -> Result<(), sqlx::Error> {
+    sqlx::query!(
         r#"
         WITH picked AS (
             SELECT code
@@ -37,27 +46,11 @@ pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>)
         form.name,
         Utc::now()
     )
-    .execute(pool.get_ref())
-    .instrument(query_span)
+    .execute(pool)
     .await
-    {
-        Ok(result) => {
-            if result.rows_affected() == 0 {
-                tracing::error!("request_id {} - PDN code pool exhausted", request_id);
-                return HttpResponse::InternalServerError().finish();
-            }
-
-            tracing::info!("request_id {} - New player registered", request_id);
-            HttpResponse::Ok().finish()
-        }
-
-        Err(e) => {
-            tracing::error!(
-                "request_id {} - Failed to execute query: {:?}",
-                request_id,
-                e
-            );
-            HttpResponse::InternalServerError().finish()
-        }
-    }
+    .map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?;
+    Ok(())
 }
