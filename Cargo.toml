@@ -15,6 +15,7 @@ path = "src/main.rs"
 reqwest = "0.13"
 
 [dependencies]
+serde-aux = "4"
 secrecy = { version= "0.8", features = ["serde"] }
 config = "0.14"
 actix-web = "4"

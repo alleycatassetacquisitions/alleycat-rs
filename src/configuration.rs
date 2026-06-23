@@ -1,5 +1,7 @@
 use secrecy::ExposeSecret;
 use secrecy::Secret;
+use serde_aux::field_attributes::deserialize_number_from_string;
+use sqlx::postgres::PgConnectOptions;
 
 #[derive(serde::Deserialize)]
 pub struct Settings {
@@ -9,15 +11,17 @@ pub struct Settings {
 
 #[derive(serde::Deserialize)]
 pub struct ApplicationSettings {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
 }
 
 #[derive(serde::Deserialize, Clone)]
 pub struct DatabaseSettings {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
     pub username: String,
     pub password: Secret<String>,
-    pub port: u16,
     pub host: String,
     pub database_name: String,
 }
@@ -38,6 +42,7 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         .add_source(config::File::from(
             configuration_directory.join(environment_filename),
         ))
+        .add_source(config::Environment::with_prefix("APP"))
         .build()?;
 
     settings.try_deserialize::<Settings>()
@@ -73,17 +78,12 @@ impl TryFrom<String> for Environment {
 }
 
 impl DatabaseSettings {
-    pub fn connection_string(&self) -> Secret<String> {
-        let DatabaseSettings {
-            username,
-            password,
-            port,
-            host,
-            database_name,
-        } = self;
-        Secret::new(format!(
-            "postgres://{username}:{}@{host}:{port}/{database_name}",
-            password.expose_secret(),
-        ))
+    pub fn connection_options(&self) -> PgConnectOptions {
+        PgConnectOptions::new()
+            .host(&self.host)
+            .username(&self.username)
+            .password(&self.password.expose_secret())
+            .port(self.port)
+            .database(&self.database_name)
     }
 }
