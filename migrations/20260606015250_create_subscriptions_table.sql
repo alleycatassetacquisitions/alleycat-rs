@@ -31,6 +31,7 @@ create table players (
     pdn_code text not null unique check (pdn_code ~ '^[0-9]{4}$'),
     name text not null unique,
     mode player_mode not null default 'unassigned',
+    email text,
     created_at timestamptz not null
 );
 

@@ -97,7 +97,7 @@ async fn register_player_returns_a_200_for_valid_form_data() {
     let TestApp { address, db_pool } = spawn_app().await;
     let client = reqwest::Client::new();
     // Act
-    let body = "name=le%20guin";
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = client
         .post(&format!("{address}/players"))
         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -107,12 +107,13 @@ async fn register_player_returns_a_200_for_valid_form_data() {
         .expect("Failed to execute request.");
     // Assert
     assert_eq!(200, response.status().as_u16());
-    let saved = sqlx::query!("SELECT name, pdn_code FROM players",)
+    let saved = sqlx::query!("SELECT name, email, pdn_code FROM players",)
         .fetch_one(&db_pool)
         .await
         .expect("Failed to fetch saved subscription.");
 
     assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.email, Some("ursula_le_guin@gmail.com".to_string()));
     assert_eq!(saved.pdn_code.len(), 4);
     assert!(saved.pdn_code.chars().all(|c| c.is_ascii_digit()));
 }

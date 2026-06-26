@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH picked AS (\n            SELECT code\n            FROM available_pdn_codes\n            ORDER BY random()\n            LIMIT 1\n            FOR UPDATE SKIP LOCKED\n        ),\n        created AS (\n            INSERT INTO players (id, pdn_code, name, email, created_at)\n            SELECT $1, picked.code, $2, $3, $4\n            FROM picked\n            RETURNING pdn_code\n        )\n        DELETE FROM available_pdn_codes\n        WHERE code = (SELECT pdn_code FROM created)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "203c3c5e9d75487d33ebfb9bf567c893632f425f14175da1e16a6d9c21f7eee8"
+}

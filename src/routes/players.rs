@@ -6,6 +6,7 @@ use uuid::Uuid;
 #[derive(serde::Deserialize)]
 pub struct FormData {
     name: String,
+    email: Option<String>,
 }
 
 #[tracing::instrument(
@@ -34,8 +35,8 @@ pub async fn insert_player(pool: &PgPool, form: &FormData) -> Result<(), sqlx::E
             FOR UPDATE SKIP LOCKED
         ),
         created AS (
-            INSERT INTO players (id, pdn_code, name, created_at)
-            SELECT $1, picked.code, $2, $3
+            INSERT INTO players (id, pdn_code, name, email, created_at)
+            SELECT $1, picked.code, $2, $3, $4
             FROM picked
             RETURNING pdn_code
         )
@@ -44,6 +45,7 @@ pub async fn insert_player(pool: &PgPool, form: &FormData) -> Result<(), sqlx::E
         "#,
         Uuid::new_v4(),
         form.name,
+        form.email.as_deref(),
         Utc::now()
     )
     .execute(pool)
