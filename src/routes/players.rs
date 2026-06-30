@@ -1,3 +1,4 @@
+use crate::domain::{NewPlayer, PlayerEmail, PlayerName};
 use actix_web::{HttpResponse, web};
 use chrono::Utc;
 use sqlx::PgPool;
@@ -16,15 +17,28 @@ pub struct FormData {
         name = %form.name
     )
 )]
+
 pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>) -> HttpResponse {
-    match insert_player(&pool, &form).await {
+    let name = match PlayerName::parse(form.0.name) {
+        Ok(name) => name,
+        Err(_) => return HttpResponse::BadRequest().finish(),
+    };
+    let email = match PlayerEmail::parse(form.0.email.unwrap_or_default()) {
+        Ok(email) => email,
+        Err(_) => return HttpResponse::BadRequest().finish(),
+    };
+    let new_player = NewPlayer {
+        email: email,
+        name: name,
+    };
+    match insert_player(&pool, &new_player).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
 
-#[tracing::instrument(name = "Adding a player to the database", skip(form, pool))]
-pub async fn insert_player(pool: &PgPool, form: &FormData) -> Result<(), sqlx::Error> {
+#[tracing::instrument(name = "Adding a player to the database", skip(new_player, pool))]
+pub async fn insert_player(pool: &PgPool, new_player: &NewPlayer) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         WITH picked AS (
@@ -44,8 +58,8 @@ pub async fn insert_player(pool: &PgPool, form: &FormData) -> Result<(), sqlx::E
         WHERE code = (SELECT pdn_code FROM created)
         "#,
         Uuid::new_v4(),
-        form.name,
-        form.email.as_deref(),
+        new_player.name.as_ref(),
+        new_player.email.as_ref(),
         Utc::now()
     )
     .execute(pool)

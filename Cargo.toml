@@ -12,9 +12,12 @@ name = "alleycat-rs"
 path = "src/main.rs"
 
 [dev-dependencies]
+claims = "0.7"
 reqwest = "0.13"
 
 [dependencies]
+validator= "0.18"
+unicode-segmentation= "1"
 serde-aux = "4"
 secrecy = { version= "0.8", features = ["serde"] }
 config = "0.14"
