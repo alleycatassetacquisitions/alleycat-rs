@@ -119,12 +119,36 @@ async fn register_player_returns_a_200_for_valid_form_data() {
 }
 
 #[tokio::test]
+async fn register_player_accepts_a_missing_email() {
+    let TestApp { address, db_pool } = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let response = client
+        .post(format!("{address}/players"))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body("name=Ursula")
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    assert_eq!(200, response.status().as_u16());
+
+    let saved = sqlx::query!("SELECT name, email FROM players")
+        .fetch_one(&db_pool)
+        .await
+        .expect("Failed to fetch saved player.");
+
+    assert_eq!(saved.name, "Ursula");
+    assert_eq!(saved.email, None);
+}
+
+#[tokio::test]
 async fn register_player_returns_a_400_when_fields_are_present_but_invalid() {
     // Arrange
     let TestApp { address, .. } = spawn_app().await;
     let client = reqwest::Client::new();
     let test_cases = vec![
-        ("name=$email=ursula_le_guin%40gamil.com", "empty name"),
+        ("name=&email=ursula_le_guin%40gamil.com", "empty name"),
         ("name=Ursula&email=definitely-not-an-email", "invalid email"),
     ];
     for (body, description) in test_cases {

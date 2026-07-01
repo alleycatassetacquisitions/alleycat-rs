@@ -14,16 +14,16 @@ pub struct FormData {
     name = "Registering player",
     skip(form, pool),
     fields(
-        name = %form.name
+        name = %form.name,
+        email = %form.email.is_some(),
     )
 )]
-
 pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>) -> HttpResponse {
     let name = match PlayerName::parse(form.0.name) {
         Ok(name) => name,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
-    let email = match PlayerEmail::parse(form.0.email.unwrap_or_default()) {
+    let email = match form.0.email.map(PlayerEmail::parse).transpose() {
         Ok(email) => email,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
@@ -59,7 +59,7 @@ pub async fn insert_player(pool: &PgPool, new_player: &NewPlayer) -> Result<(), 
         "#,
         Uuid::new_v4(),
         new_player.name.as_ref(),
-        new_player.email.as_ref(),
+        new_player.email.as_ref().map(|email| email.as_ref()),
         Utc::now()
     )
     .execute(pool)

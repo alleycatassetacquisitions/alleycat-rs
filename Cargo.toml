@@ -12,8 +12,12 @@ name = "alleycat-rs"
 path = "src/main.rs"
 
 [dev-dependencies]
+fake = "2.9"
 claims = "0.7"
 reqwest = "0.13"
+quickcheck= "1.0.3"
+quickcheck_macros= "1"
+rand = "0.8"
 
 [dependencies]
 validator= "0.18"
