@@ -10,6 +10,16 @@ pub struct FormData {
     email: Option<String>,
 }
 
+impl TryFrom<FormData> for NewPlayer {
+    type Error = String;
+
+    fn try_from(value: FormData) -> Result<Self, Self::Error> {
+        let name = PlayerName::parse(value.name)?;
+        let email = value.email.map(PlayerEmail::parse).transpose()?;
+        Ok(NewPlayer { email, name })
+    }
+}
+
 #[tracing::instrument(
     name = "Registering player",
     skip(form, pool),
@@ -19,17 +29,9 @@ pub struct FormData {
     )
 )]
 pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>) -> HttpResponse {
-    let name = match PlayerName::parse(form.0.name) {
-        Ok(name) => name,
+    let new_player = match form.0.try_into() {
+        Ok(player) => player,
         Err(_) => return HttpResponse::BadRequest().finish(),
-    };
-    let email = match form.0.email.map(PlayerEmail::parse).transpose() {
-        Ok(email) => email,
-        Err(_) => return HttpResponse::BadRequest().finish(),
-    };
-    let new_player = NewPlayer {
-        email: email,
-        name: name,
     };
     match insert_player(&pool, &new_player).await {
         Ok(_) => HttpResponse::Ok().finish(),
