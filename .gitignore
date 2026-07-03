@@ -2,3 +2,4 @@
 /coverage/
 /lcov.info
 /.env
+/backups/
