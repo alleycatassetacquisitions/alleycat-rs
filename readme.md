@@ -1,8 +1,6 @@
 # alleycat-rs
 
-## local docker operation
-
-This is the path for running Alleycat locally without knowing Rust.
+## Running the Server
 
 ### requirements
 
