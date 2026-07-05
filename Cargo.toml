@@ -3,6 +3,7 @@ name = "alleycat-rs"
 version = "0.1.0"
 edition = "2024"
 authors = ["Zach Koch <ezekeal@gmail.com>"]
+license = "AGPL-3.0-only"
 
 [lib]
 path = "src/lib.rs"
