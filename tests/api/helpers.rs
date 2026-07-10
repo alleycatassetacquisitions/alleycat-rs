@@ -1,9 +1,8 @@
 use alleycat_rs::configuration::{DatabaseSettings, get_configuration};
-use alleycat_rs::startup::run;
+use alleycat_rs::startup::{Application, get_connection_pool};
 use alleycat_rs::telemetry::{get_subscriber, init_subscriber};
 use secrecy::Secret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::net::TcpListener;
 use std::sync::LazyLock;
 use uuid::Uuid;
 
@@ -27,19 +26,24 @@ pub struct TestApp {
 pub async fn spawn_app() -> TestApp {
     LazyLock::force(&TRACING);
 
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
-    let port = listener.local_addr().unwrap().port();
-    let address = format!("http://127.0.0.1:{port}");
+    let configuration = {
+        let mut c = get_configuration().expect("Failed to read configuration.");
+        c.database.database_name = format!("alleycat_test_{}", Uuid::new_v4());
+        c.application.port = 0;
+        c
+    };
 
-    let mut configuration = get_configuration().expect("Failed to read configuration.");
-    configuration.database.database_name = format!("alleycat_test_{}", Uuid::new_v4());
-    let connection_pool = configure_database(&configuration.database).await;
+    configure_database(&configuration.database).await;
 
-    let server = run(listener, connection_pool.clone()).expect("Failed to bind address");
-    let _ = tokio::spawn(server);
+    let application = Application::build(configuration.clone())
+        .await
+        .expect("Failed to build application.");
+    let address = format!("http://127.0.0.1:{}", application.port());
+    let _ = tokio::spawn(application.run_until_stopped());
+
     TestApp {
-        address,
-        db_pool: connection_pool,
+        address: address,
+        db_pool: get_connection_pool(&configuration.database),
     }
 }
 
