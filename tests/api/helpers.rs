@@ -23,6 +23,18 @@ pub struct TestApp {
     pub db_pool: PgPool,
 }
 
+impl TestApp {
+    pub async fn post_players(&self, body: String) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("{}/players", &self.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Faiiled to execute request.")
+    }
+}
+
 pub async fn spawn_app() -> TestApp {
     LazyLock::force(&TRACING);
 

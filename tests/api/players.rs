@@ -1,25 +1,16 @@
-use crate::helpers::{TestApp, spawn_app};
+use crate::helpers::spawn_app;
 
 //TODO add a test for name uniquness, maybe after a test refactor
 
 #[tokio::test]
 async fn register_player_returns_a_200_for_valid_form_data() {
-    // Arrange
-    let TestApp { address, db_pool } = spawn_app().await;
-    let client = reqwest::Client::new();
-    // Act
+    let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-    let response = client
-        .post(&format!("{address}/players"))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
-    // Assert
+    let response = app.post_players(body.into()).await;
+
     assert_eq!(200, response.status().as_u16());
     let saved = sqlx::query!("SELECT name, email, pdn_code FROM players",)
-        .fetch_one(&db_pool)
+        .fetch_one(&app.db_pool)
         .await
         .expect("Failed to fetch saved subscription.");
 
@@ -31,21 +22,14 @@ async fn register_player_returns_a_200_for_valid_form_data() {
 
 #[tokio::test]
 async fn register_player_accepts_a_missing_email() {
-    let TestApp { address, db_pool } = spawn_app().await;
-    let client = reqwest::Client::new();
-
-    let response = client
-        .post(format!("{address}/players"))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body("name=Ursula")
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    let app = spawn_app().await;
+    let body = "name=Ursula";
+    let response = app.post_players(body.into()).await;
 
     assert_eq!(200, response.status().as_u16());
 
     let saved = sqlx::query!("SELECT name, email FROM players")
-        .fetch_one(&db_pool)
+        .fetch_one(&app.db_pool)
         .await
         .expect("Failed to fetch saved player.");
 
@@ -55,23 +39,13 @@ async fn register_player_accepts_a_missing_email() {
 
 #[tokio::test]
 async fn register_player_returns_a_400_when_fields_are_present_but_invalid() {
-    // Arrange
-    let TestApp { address, .. } = spawn_app().await;
-    let client = reqwest::Client::new();
+    let app = spawn_app().await;
     let test_cases = vec![
         ("name=&email=ursula_le_guin%40gamil.com", "empty name"),
         ("name=Ursula&email=definitely-not-an-email", "invalid email"),
     ];
     for (body, description) in test_cases {
-        // Act
-        let response = client
-            .post(&format!("{address}/players"))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
-        // Assert
+        let response = app.post_players(body.into()).await;
         assert_eq!(
             400,
             response.status().as_u16(),
@@ -83,21 +57,11 @@ async fn register_player_returns_a_400_when_fields_are_present_but_invalid() {
 
 #[tokio::test]
 async fn register_player_returns_a_400_when_data_is_missing() {
-    // Arrange
-    let TestApp { address, .. } = spawn_app().await;
-    let client = reqwest::Client::new();
+    let app = spawn_app().await;
     let test_cases = vec![("", "missing the name"), ("score=100", "invalid parameter")];
 
     for (invalid_body, error_message) in test_cases {
-        // Act
-        let response = client
-            .post(&format!("{address}/players"))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(invalid_body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
-        // Assert
+        let response = app.post_players(invalid_body.into()).await;
         assert_eq!(
             400,
             response.status().as_u16(),
