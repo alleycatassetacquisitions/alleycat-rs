@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id, pdn_code, name, created_at,\n            mode AS \"mode: PlayerMode\"\n        FROM players\n        ORDER BY created_at DESC, id DESC\n        LIMIT $1 OFFSET $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "pdn_code",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "mode: PlayerMode",
+        "type_info": {
+          "Custom": {
+            "name": "player_mode",
+            "kind": {
+              "Enum": [
+                "unassigned",
+                "hunter",
+                "bounty"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5c6feb585c26e60572de242f1a456efcd034441488ec8d66f134e81ba701a455"
+}

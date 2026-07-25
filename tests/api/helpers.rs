@@ -33,6 +33,14 @@ impl TestApp {
             .await
             .expect("Faiiled to execute request.")
     }
+
+    pub async fn get_players(&self) -> reqwest::Response {
+        reqwest::Client::new()
+            .get(&format!("{}/players", &self.address))
+            .send()
+            .await
+            .expect("Faiiled to execute request.")
+    }
 }
 
 pub async fn spawn_app() -> TestApp {
