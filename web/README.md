@@ -23,7 +23,14 @@ A minimal Remix application starter with a home page.
 
 ```sh
 npm i
+npm run dev
 npm run start
 npm test
 npm run typecheck
 ```
+
+`API_ORIGIN` is the URL the UI server uses to reach the Rust API and defaults to
+`http://localhost:8000`. Override it when needed, for example with
+`API_ORIGIN=https://api.example.com npm run start`. It is only read by the UI
+server; browsers continue to make same-origin requests to the UI. Docker
+Compose supplies `http://app:8000` automatically.

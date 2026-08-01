@@ -57,6 +57,8 @@ scripts/start_local_instance.sh
 
 - run `scripts/init_db.sh`
 - `cargo run`
+- in another terminal, run `cd web && npm run dev`; the UI defaults to the API
+  at `http://localhost:8000`
 
 ## testing setup
 
