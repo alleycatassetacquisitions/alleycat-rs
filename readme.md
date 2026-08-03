@@ -23,6 +23,7 @@ container passes it through a Postgres connection URL.
 ### routine commands
 
 - start the UI, API, and Postgres with `scripts/start_local_instance.sh`
+- seed or refresh sample players and device logs with `scripts/seed_db.sh`
 - to rebuild after code changes run `docker compose build && scripts/start_local_instance.sh`
 - stop the containers without deleting them with `docker compose stop`
 - back up app logs with `scripts/backup_logs.sh`
@@ -59,6 +60,16 @@ scripts/start_local_instance.sh
 - `cargo run`
 - in another terminal, run `cd web && npm run dev`; the UI defaults to the API
   at `http://localhost:8000`
+
+The seed script uses the running Compose database by default. To seed a
+database started outside Compose, provide its connection string explicitly:
+
+```bash
+DATABASE_URL=postgres://app:secret@localhost:5432/alleycat scripts/seed_db.sh
+```
+
+The seed is transactional and repeatable: running it again refreshes the same
+five players and twelve device logs instead of creating duplicates.
 
 ## testing setup
 
