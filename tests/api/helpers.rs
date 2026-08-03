@@ -1,6 +1,7 @@
 use alleycat_rs::configuration::{DatabaseSettings, get_configuration};
 use alleycat_rs::startup::{Application, get_connection_pool};
 use alleycat_rs::telemetry::{get_subscriber, init_subscriber};
+use prost::Message;
 use secrecy::Secret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
@@ -40,6 +41,29 @@ impl TestApp {
             .send()
             .await
             .expect("Faiiled to execute request.")
+    }
+
+    pub async fn post_protobuf<M>(&self, path: &str, message: &M) -> reqwest::Response
+    where
+        M: Message,
+    {
+        self.post_bytes(path, "application/protobuf", message.encode_to_vec())
+            .await
+    }
+
+    pub async fn post_bytes(
+        &self,
+        path: &str,
+        content_type: &str,
+        body: Vec<u8>,
+    ) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(format!("{}/{}", self.address, path.trim_start_matches('/')))
+            .header("Content-Type", content_type)
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
     }
 }
 

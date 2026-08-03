@@ -1,5 +1,5 @@
 use crate::configuration::{DatabaseSettings, Settings};
-use crate::routes::{get_players, health_check, register_player};
+use crate::routes::{get_players, health_check, register_player, write_device_log};
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
 use sqlx::PgPool;
@@ -28,6 +28,7 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
         App::new()
             .wrap(TracingLogger::default())
             .route("/health_check", web::get().to(health_check))
+            .route("/device-logs", web::post().to(write_device_log))
             .route("/players", web::get().to(get_players))
             .route("/players", web::post().to(register_player))
             .app_data(db_pool.clone())
