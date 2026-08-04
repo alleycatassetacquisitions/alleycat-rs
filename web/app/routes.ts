@@ -3,7 +3,10 @@ import { get, route } from 'remix/routes'
 export const routes = route({
   assets: get('/assets/*path'),
   home: '/',
+  deviceLogs: {
+    show: get('/device-logs'),
+  },
   players: {
-    show: get("/players"),
+    show: get('/players'),
   },
 })

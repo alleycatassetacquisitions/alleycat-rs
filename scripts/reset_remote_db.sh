@@ -34,6 +34,7 @@ psql "${DATABASE_URL}" --set ON_ERROR_STOP=1 <<'SQL'
 -- Remove application tables and SQLx's migration ledger. CASCADE removes
 -- dependent constraints and indexes.
 DROP TABLE IF EXISTS
+    device_logs,
     player_roles,
     players,
     available_pdn_codes,

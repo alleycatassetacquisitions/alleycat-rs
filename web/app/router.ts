@@ -2,6 +2,7 @@ import { createRouter, type MiddlewareContext } from 'remix/router'
 import { staticFiles } from 'remix/middleware/static'
 
 import controller from './actions/controller.tsx'
+import deviceLogsController from './actions/deviceLogs/controller.tsx'
 import playersController from './actions/players/controller.tsx'
 import { apiOrigin } from './middleware/api-origin.ts'
 import { render } from './middleware/render.tsx'
@@ -20,4 +21,5 @@ export const router = createRouter<AppContext>({
 })
 
 router.map(routes, controller)
+router.map(routes.deviceLogs, deviceLogsController)
 router.map(routes.players, playersController)
