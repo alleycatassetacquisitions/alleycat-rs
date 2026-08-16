@@ -1,10 +1,13 @@
-## Register a player
+# Register a player
+
+> **Status:** Backlog; not current server behavior. See
+> [currently implemented routes](../../architecture.md#http-surface).
 
 As an event operator,
 I want to register a player quickly,
 so that I can get people into matches without slowing down the line.
 
-### Acceptance criteria
+## Acceptance criteria
 
 - [ ] Can create a player with display name
 - [ ] Rejects duplicate active player names
@@ -14,7 +17,7 @@ so that I can get people into matches without slowing down the line.
 - [ ] Covered by at least one API test
 - [ ] Some codes are reserved TBD
 
-### Notes
+## Notes
 
 - Route: POST /api/players
 - DB table: players

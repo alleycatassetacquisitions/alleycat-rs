@@ -1,6 +1,12 @@
-# Alleycat API Contract
+# Legacy Alleycat API Contract
 
-Source: `/Users/danshari/projects/alleycat/main` Hono/Bun server.
+> [!WARNING]
+> Historical porting reference—not the current Rust API. See
+> [Device API](device-api.md) and
+> [currently implemented routes](architecture.md#http-surface).
+
+Source: the earlier Hono/Bun server in the separate `alleycat` repository,
+primarily its `main` branch.
 
 This document describes the API portion to recreate in this repo. It excludes
 HTML site routes such as `/players`, `/matches`, `/scoreboard`, `/admin`, and

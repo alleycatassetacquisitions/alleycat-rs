@@ -1,6 +1,10 @@
 # New Server Stories From Alleycat User Stories
 
-These stories come from the Google Doc narrative and do not appear to have a direct equivalent in the neighboring `/Users/danshari/projects/alleycat` implementation. Some may build on translated primitives like players, matches, FDN box state, reader events, and generic missions.
+> **Status:** Backlog; not current server behavior. See
+> [currently implemented routes](../../architecture.md#http-surface).
+
+These stories come from the Google Doc narrative and have no direct equivalent
+in the separate `alleycat` implementation.
 
 ## Returning Asset Reissue
 
@@ -229,4 +233,3 @@ so that the whole event can collaborate on defeating a major target.
 - [ ] Exposes current boss health for display or device output.
 - [ ] Records final defeat.
 - [ ] Supports related awards or announcements.
-

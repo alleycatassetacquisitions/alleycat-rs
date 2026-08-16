@@ -1,77 +1,57 @@
-# alleycat-rs
+# Alleycat server
 
-## Running the Server
+Alleycat combines a Rust HTTP API, a server-rendered Remix UI, and PostgreSQL.
+It registers and lists players, ingests protobuf device crash logs, and
+displays players and logs in the UI.
 
-### requirements
+## Run the complete stack locally
 
-- Docker Desktop, or Docker Engine with Docker Compose
-- this repository checked out on the machine
-- `bunyan` is optional and only used for prettier logs
+Run the deployment-shaped local stack with Docker Compose:
 
-### first-time setup
+```bash
+test -f .env || cp .env.example .env
+```
 
-- copy `.env.example` to `.env` and set a local `POSTGRES_PASSWORD`
-- start the UI, API, and Postgres with `scripts/start_local_instance.sh`
-- open the UI at http://localhost:3000
-- test the app with `curl -i http://localhost:8000/health_check`
-- view API logs with `scripts/view_logs.sh`
-- view UI logs with `docker compose logs --no-log-prefix -f web`
+Set `POSTGRES_PASSWORD` in `.env` to a URL-safe local password, then run:
 
-Use a URL-safe database password for local Docker because the migration
-container passes it through a Postgres connection URL.
+```bash
+scripts/start_local_instance.sh
+scripts/seed_db.sh
+```
 
-### routine commands
+Then open:
 
-- start the UI, API, and Postgres with `scripts/start_local_instance.sh`
-- seed or refresh sample players and device logs with `scripts/seed_db.sh`
-- to rebuild after code changes run `docker compose build && scripts/start_local_instance.sh`
-- stop the containers without deleting them with `docker compose stop`
-- back up app logs with `scripts/backup_logs.sh`
-- back up the database with `scripts/backup_db.sh`
-- remove the containers, network, and database volume with `scripts/delete_local_instance.sh`
+- UI placeholder home: <http://localhost:3000>
+- API health check: <http://localhost:8000/health_check>
+- Players: <http://localhost:3000/players>
+- Device logs: <http://localhost:3000/device-logs>
 
-Compose runs SQLx migrations before starting the API, then starts the Remix UI
-on port 3000. The UI reaches the API over Compose's private network at
-`http://app:8000`. Docker keeps recent container logs on the host using the
-`local` log driver with rotation while the containers exist. Postgres data is
-stored in a named Docker volume; `docker compose down --volumes` deletes it.
-
-Backups are written under `backups/`, which is ignored by git.
-`scripts/delete_local_instance.sh` runs both backup scripts before deleting the
-local database volume.
-
-If application code, migrations, or Docker files change, rebuild the images
-before restarting:
+Rebuild after source changes:
 
 ```bash
 docker compose build
 scripts/start_local_instance.sh
 ```
 
-## development requirements
+`docker compose stop` preserves its data. Read the
+[operations guide](docs/operations.md) before deleting containers or databases.
 
-- rust
-- sqlx-cli, installed with `cargo install sqlx-cli`
-- docker
+## Documentation
 
-## development setup
+The [documentation map](docs/README.md) routes maintainers, operators, and
+device developers to current guides and separates them from planning material.
 
-- run `scripts/init_db.sh`
-- `cargo run`
-- in another terminal, run `cd web && npm run dev`; the UI defaults to the API
-  at `http://localhost:8000`
+## Repository map
 
-The seed script uses the running Compose database by default. To seed a
-database started outside Compose, provide its connection string explicitly:
+| Path | Responsibility |
+| --- | --- |
+| [`src/`](src/) | Rust API, domain validation, configuration, and telemetry |
+| [`web/`](web/) | Server-rendered Remix UI and its API client |
+| [`proto/`](proto/) | Device-facing Protocol Buffer contract |
+| [`migrations/`](migrations/) | Ordered PostgreSQL schema migrations |
+| [`configuration/`](configuration/) | Layered API configuration for local and production use |
+| [`scripts/`](scripts/) | Development and operations helpers |
+| [`tests/api/`](tests/api/) | Black-box API tests against temporary PostgreSQL databases |
+| [`spec.yaml`](spec.yaml) | Desired DigitalOcean App Platform topology |
 
-```bash
-DATABASE_URL=postgres://app:secret@localhost:5432/alleycat scripts/seed_db.sh
-```
-
-The seed is transactional and repeatable: running it again refreshes the same
-five players and twelve device logs instead of creating duplicates.
-
-## testing setup
-
-- run `scripts/prepare_sqlx.sh`
-- `cargo test`
+The project is licensed under [AGPL-3.0-only](LICENSE).
