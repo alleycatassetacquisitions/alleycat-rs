@@ -1,9 +1,0 @@
-.agents/
-node_modules/
-db/
-tmp/
-.DS_Store
-AGENTS.md
-Dockerfile
-README.md
-npm-debug.log*

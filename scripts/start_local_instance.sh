@@ -17,7 +17,5 @@ docker compose rm -f migrate >/dev/null 2>&1 || true
 docker compose up -d
 
 echo "Local instance is starting."
-echo "Web UI: http://localhost:3000"
 echo "Health check: curl -i http://localhost:8000/health_check"
 echo "API logs: docker compose logs --no-log-prefix -f app | bunyan"
-echo "UI logs: docker compose logs --no-log-prefix -f web"
