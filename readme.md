@@ -1,83 +1,96 @@
-# alleycat-rs
+# Alleycat server
 
-## Running the Server
+Alleycat is a Rust HTTP API backed by PostgreSQL. This guide runs the API and
+database together on one machine with Docker Compose.
 
-### requirements
+> This deployment publishes an unauthenticated API on port `8000`. Use it only
+> on a trusted network; do not expose it directly to the internet.
 
-- Docker Desktop, or Docker Engine with Docker Compose
-- this repository checked out on the machine
-- `bunyan` is optional and only used for prettier logs
+## Requirements
 
-### first-time setup
+- Git
+- [Docker with Docker Compose](https://docs.docker.com/get-started/get-docker/)
+- [Rustup](https://rustup.rs/), which provides Cargo
 
-- copy `.env.example` to `.env` and set a local `POSTGRES_PASSWORD`
-- start the API and Postgres with `scripts/start_local_instance.sh`
-- test the app with `curl -i http://localhost:8000/health_check`
-- view API logs with `scripts/view_logs.sh`
+You do not need Rust experience to deploy Alleycat. Rust is required to run the
+repository's task interface. The repository selects Rust `1.95.0`
+automatically; the first Cargo command may download that toolchain and compile
+the task program.
 
-Use a URL-safe database password for local Docker because the migration
-container passes it through a Postgres connection URL.
+## Deploy locally
 
-### routine commands
+After cloning the repository, run these commands from its root.
 
-- start the API and Postgres with `scripts/start_local_instance.sh`
-- seed or refresh sample players and device logs with `scripts/seed_db.sh`
-- to rebuild after code changes run `docker compose build && scripts/start_local_instance.sh`
-- stop the containers without deleting them with `docker compose stop`
-- back up app logs with `scripts/backup_logs.sh`
-- back up the database with `scripts/backup_db.sh`
-- remove the containers, network, and database volume with `scripts/delete_local_instance.sh`
+Check the tools already installed on the machine:
 
-Compose runs SQLx migrations before starting the API. Docker keeps recent
-container logs on the host using the `local` log driver with rotation while
-the containers exist. Postgres data is stored in a named Docker volume;
-`docker compose down --volumes` deletes it.
+```bash
+cargo xtask doctor
+```
 
-Backups are written under `backups/`, which is ignored by git.
-`scripts/delete_local_instance.sh` runs both backup scripts before deleting the
-local database volume.
+Create the local configuration:
 
-If application code, migrations, or Docker files change, rebuild the images
-before restarting:
+```bash
+cp .env.example .env
+```
+
+Replace `POSTGRES_PASSWORD` in `.env` with a URL-safe local password. Then
+build and start the containers:
 
 ```bash
 docker compose build
 scripts/start_local_instance.sh
 ```
 
-## development requirements
-
-- rust
-- sqlx-cli, installed with `cargo install sqlx-cli`
-- docker
-
-## development setup
-
-- run `scripts/init_db.sh`
-- `cargo run`
-
-The seed script uses the running Compose database by default. To seed a
-database started outside Compose, provide its connection string explicitly:
+Confirm that the API is running:
 
 ```bash
-DATABASE_URL=postgres://app:secret@localhost:5432/alleycat scripts/seed_db.sh
+curl -i http://localhost:8000/health_check
 ```
 
-The seed is transactional and repeatable: running it again refreshes the same
-five players and twelve device logs instead of creating duplicates.
+A healthy API returns `200 OK`. To add repeatable sample players and device
+logs:
 
-## UI-facing endpoints
+```bash
+scripts/seed_db.sh
+```
 
-The separately hosted UI can use these API endpoints directly:
+## Routine commands
 
-- `GET /players` lists players.
-- `POST /players` registers a player using form data.
-- `GET /device-logs` lists device logs.
+```bash
+# Follow API logs.
+scripts/view_logs.sh
 
-The device ingestion endpoint remains `POST /device-logs` and accepts a
-Protocol Buffers payload.
+# Stop the containers while preserving the database.
+docker compose stop
 
-## testing setup
+# Start them again and apply pending migrations.
+scripts/start_local_instance.sh
+```
 
-- run `scripts/prepare_sqlx.sh`
-- `cargo test`
+Compose uses built images rather than live source files. After pulling or
+changing application code, rebuild before restarting:
+
+```bash
+docker compose build
+scripts/start_local_instance.sh
+```
+
+PostgreSQL data remains in a Docker volume when the containers stop.
+`scripts/delete_local_instance.sh` backs up the database and logs, asks for
+confirmation, and then deletes the local containers and database volume.
+
+## Native development
+
+For API development outside Compose, initialize the standalone development
+database and run the server:
+
+```bash
+scripts/init_db.sh
+cargo run
+```
+
+Run the test suite with:
+
+```bash
+cargo test
+```
