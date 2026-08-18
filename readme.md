@@ -24,7 +24,7 @@ After cloning the repository, run these commands from its root.
 Check the tools already installed on the machine:
 
 ```bash
-cargo xtask doctor
+cargo xtask stack doctor
 ```
 
 Create the local configuration:

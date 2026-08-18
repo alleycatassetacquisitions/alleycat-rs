@@ -1,4 +1,7 @@
-mod doctor;
+mod cloud;
+mod command;
+mod native;
+mod stack;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -11,14 +14,29 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Check the tools and files required for development.
-    Doctor,
+    /// Commands for host-native development.
+    Native {
+        #[command(subcommand)]
+        command: native::Command,
+    },
+    /// Commands for managing local Compose deployments.
+    Stack {
+        #[command(subcommand)]
+        command: stack::Command,
+    },
+    /// Commands for managing the shared cloud environment.
+    Cloud {
+        #[command(subcommand)]
+        command: cloud::Command,
+    },
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Doctor => doctor::run(),
+        Command::Native { command } => native::run(command),
+        Command::Stack { command } => stack::run(command),
+        Command::Cloud { command } => cloud::run(command),
     }
 }
