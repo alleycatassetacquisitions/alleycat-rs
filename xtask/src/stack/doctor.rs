@@ -1,6 +1,6 @@
 use crate::command::command_output;
+use crate::env::read_env_file;
 use anyhow::{Result, bail};
-use std::collections::HashMap;
 use std::path::Path;
 
 pub fn run() -> Result<()> {
@@ -171,8 +171,4 @@ fn check_env_keys() -> CheckResult {
             },
         }
     }
-}
-
-fn read_env_file(path: &str) -> Result<HashMap<String, String>, dotenvy::Error> {
-    dotenvy::from_path_iter(path)?.collect()
 }
