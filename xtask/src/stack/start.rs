@@ -1,14 +1,12 @@
 use crate::env::read_env_file;
+use crate::project::project_root;
 use anyhow::{Context, Result, bail};
-use std::path::Path;
 use std::process::{Command, Stdio};
 
 pub fn run() -> Result<()> {
     super::doctor::run()?;
 
-    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .context("xtask should be inside the repository root")?;
+    let project_root = project_root()?;
 
     let _ = Command::new("docker")
         .args(["compose", "rm", "-f", "migrate"])

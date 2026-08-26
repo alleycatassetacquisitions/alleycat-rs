@@ -2,6 +2,8 @@ mod cloud;
 mod command;
 mod env;
 mod native;
+mod project;
+mod seed;
 mod stack;
 
 use anyhow::Result;
