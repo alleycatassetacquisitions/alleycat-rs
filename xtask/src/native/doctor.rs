@@ -1,18 +1,11 @@
-use anyhow::Result;
+//! Inspect native prerequisites and database state without changing them.
+//! Implement the checks below as needed by the native workflows; report fixes
+//! and fail when a required check fails. Do not install tools or reset data.
 
-type Check = fn() -> Result<()>;
+use anyhow::{Result, bail};
 
 pub fn run() -> Result<()> {
-    let checks: [Check; 0] = [];
-
-    println!("Alleycat native development environment\n");
-
-    for check in checks {
-        check()?;
-    }
-
-    println!("No native development checks are implemented yet.");
-    Ok(())
+    bail!("native doctor is not implemented yet")
 }
 
 // Suggested future native-development checks, roughly in implementation order:

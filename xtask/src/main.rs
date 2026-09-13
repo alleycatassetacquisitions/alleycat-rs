@@ -4,6 +4,7 @@ mod env;
 mod native;
 mod project;
 mod seed;
+mod sqlx;
 mod stack;
 
 use anyhow::Result;
@@ -32,6 +33,11 @@ enum Command {
         #[command(subcommand)]
         command: cloud::Command,
     },
+    /// Commands for maintaining SQLx query metadata (not implemented yet).
+    Sqlx {
+        #[command(subcommand)]
+        command: sqlx::Command,
+    },
 }
 
 fn main() -> Result<()> {
@@ -41,5 +47,6 @@ fn main() -> Result<()> {
         Command::Native { command } => native::run(command),
         Command::Stack { command } => stack::run(command),
         Command::Cloud { command } => cloud::run(command),
+        Command::Sqlx { command } => sqlx::run(command),
     }
 }

@@ -1,18 +1,12 @@
-use anyhow::Result;
+//! Inspect the explicitly selected cloud target without changing shared state.
+//! Start with target validation, required tools, connectivity, and migration
+//! status. The broader checks below are follow-ups, not prerequisites for
+//! porting reset. Fail on required-check errors without exposing credentials.
 
-type Check = fn() -> Result<()>;
+use anyhow::{Result, bail};
 
 pub fn run() -> Result<()> {
-    let checks: [Check; 0] = [];
-
-    println!("Alleycat shared cloud environment\n");
-
-    for check in checks {
-        check()?;
-    }
-
-    println!("No cloud checks are implemented yet.");
-    Ok(())
+    bail!("cloud doctor is not implemented yet")
 }
 
 // Suggested future cloud checks, roughly in implementation order:

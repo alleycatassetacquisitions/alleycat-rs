@@ -1,4 +1,6 @@
-use ::anyhow::Result;
+//! Dispatch Compose database workflows; seeding already has an implementation.
+
+use anyhow::Result;
 use clap::Subcommand;
 
 mod backup;
@@ -8,13 +10,13 @@ mod seed;
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Run migrations.
+    /// Run migrations (not implemented yet).
     Migrate,
     /// Seed the database with dummy data.
     Seed,
-    /// Backup the database.
+    /// Back up the database (not implemented yet).
     Backup,
-    /// Reset the database to a clean state.
+    /// Reset the database to a clean state (not implemented yet).
     Reset,
 }
 
