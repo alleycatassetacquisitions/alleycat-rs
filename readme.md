@@ -21,24 +21,24 @@ the task program.
 
 After cloning the repository, run these commands from its root.
 
-Check the tools already installed on the machine:
-
-```bash
-cargo xtask stack doctor
-```
-
 Create the local configuration:
 
 ```bash
 cp .env.example .env
 ```
 
-Replace `POSTGRES_PASSWORD` in `.env` with a URL-safe local password. Then
-build and start the containers:
+Replace `POSTGRES_PASSWORD` in `.env` with a URL-safe local password, then
+check the tools and configuration:
+
+```bash
+cargo xtask stack doctor
+```
+
+Build and start the containers:
 
 ```bash
 docker compose build
-scripts/start_local_instance.sh
+cargo xtask stack start
 ```
 
 Confirm that the API is running:
@@ -47,7 +47,8 @@ Confirm that the API is running:
 curl -i http://localhost:8000/health_check
 ```
 
-A healthy API returns `200 OK`. To add repeatable sample players and device
+A healthy API returns `200 OK`. If you changed `APP_PORT`, use that port in the
+health-check URL. To add repeatable sample players and device
 logs:
 
 ```bash
@@ -64,7 +65,7 @@ scripts/view_logs.sh
 docker compose stop
 
 # Start them again and apply pending migrations.
-scripts/start_local_instance.sh
+cargo xtask stack start
 ```
 
 Compose uses built images rather than live source files. After pulling or
@@ -72,12 +73,12 @@ changing application code, rebuild before restarting:
 
 ```bash
 docker compose build
-scripts/start_local_instance.sh
+cargo xtask stack start
 ```
 
 PostgreSQL data remains in a Docker volume when the containers stop.
-`scripts/delete_local_instance.sh` backs up the database and logs, asks for
-confirmation, and then deletes the local containers and database volume.
+`scripts/delete_local_instance.sh` asks for confirmation, backs up logs and the
+database, and then deletes the local containers and database volume.
 
 ## Native development
 

@@ -34,7 +34,7 @@ pub fn run() -> Result<()> {
 
     println!("Local instance is starting.");
     println!("Health check: curl -i http://localhost:{app_port}/health_check");
-    println!("API logs: cargo xtask stack logs");
+    println!("API logs: scripts/view_logs.sh");
 
     Ok(())
 }

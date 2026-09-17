@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SEED_FILE="${SCRIPT_DIR}/seed_db.sql"
+SEED_FILE="${PROJECT_ROOT}/xtask/seed_db.sql"
 
 if [[ -n "${DATABASE_URL:-}" ]]; then
     if ! command -v psql >/dev/null 2>&1; then
@@ -23,7 +23,7 @@ else
 
     if [[ "$(docker compose ps --status running --services postgres)" != "postgres" ]]; then
         echo >&2 "The local Postgres container is not running."
-        echo >&2 "Start it with: scripts/start_local_instance.sh"
+        echo >&2 "Start it with: cargo xtask stack start"
         exit 1
     fi
 

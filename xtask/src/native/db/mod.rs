@@ -6,7 +6,6 @@ use clap::Subcommand;
 mod clean_tests;
 mod delete;
 mod init;
-mod migrate;
 mod reset;
 mod seed;
 
@@ -14,8 +13,6 @@ mod seed;
 pub enum Command {
     /// Initialize standalone Postgres and apply migrations (not implemented yet).
     Init,
-    /// Apply pending migrations (not implemented yet).
-    Migrate,
     /// Seed the native database (not implemented yet).
     Seed,
     /// Recreate the native database container (not implemented yet).
@@ -29,7 +26,6 @@ pub enum Command {
 pub fn run(command: Command) -> Result<()> {
     match command {
         Command::Init => init::run(),
-        Command::Migrate => migrate::run(),
         Command::Seed => seed::run(),
         Command::Reset => reset::run(),
         Command::Delete => delete::run(),
