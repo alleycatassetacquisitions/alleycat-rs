@@ -1,6 +1,6 @@
 # Server Stories Translated From Alleycat
 
-These stories come from the neighboring implementation at `/Users/danshari/projects/alleycat`, mainly the `main` worktree. They should be treated as porting work into this Rust server rather than new product design.
+These stories come from the old codebase at `/Users/danshari/projects/alleycat-server-bun`. They should be treated as porting work into this Rust server rather than new product design.
 
 ## Register a Player
 
@@ -261,4 +261,3 @@ so that mission progress can be tracked during the event.
 ### Previous implementation notes
 
 - Source behavior exists in `alleycat/main/routes/site/affiliate.tsx`, `alleycat/main/db/queries.ts`, and `alleycat/main/db/mutations.ts`.
-

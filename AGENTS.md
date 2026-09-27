@@ -1,5 +1,15 @@
 # Repository guidance
 
+## Old codebase
+
+- For this project, "the old codebase" refers to the Hono/Bun server in
+  `../alleycat-server-bun` (`/Users/danshari/projects/alleycat-server-bun`).
+- Its repository is https://github.com/alleycatassetacquisitions/alleycat-server-bun.
+- When working on this project, keep a local checkout of that repository alongside
+  this one at `../alleycat-server-bun`; clone it there if it is missing.
+- Use it as the reference implementation when investigating existing behavior
+  or porting features to this Rust server.
+
 ## Database migrations
 
 - `scripts/reset_remote_db.sh` resets the disposable DigitalOcean database by

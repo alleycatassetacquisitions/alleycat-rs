@@ -1,6 +1,6 @@
 # Alleycat API Contract
 
-Source: `/Users/danshari/projects/alleycat/main` Hono/Bun server.
+Source: `/Users/danshari/projects/alleycat-server-bun` Hono/Bun server (the old codebase).
 
 This document describes the API portion to recreate in this repo. It excludes
 HTML site routes such as `/players`, `/matches`, `/scoreboard`, `/admin`, and
