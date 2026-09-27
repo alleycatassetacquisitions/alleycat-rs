@@ -37,6 +37,9 @@ DROP TABLE IF EXISTS
     device_logs,
     player_roles,
     players,
+    app_state,
+    events,
+    reserved_pdn_codes,
     available_pdn_codes,
     _sqlx_migrations
 CASCADE;
