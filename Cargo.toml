@@ -35,7 +35,10 @@ unicode-segmentation= "1"
 serde-aux = "4"
 secrecy = { version= "0.8", features = ["serde"] }
 config = "0.14"
-actix-web = { version = "4", default-features = false }
+actix-web = { version = "4", default-features = false, features = [
+    "macros", "compress-brotli", "compress-gzip", "compress-zstd",
+    "cookies", "unicode", "compat", "ws",
+] }
 tokio = { version= "1", features = ["macros", "rt-multi-thread"] }
 serde = { version= "1", features = ["derive"]}
 uuid = { version= "1", features = ["v4", "serde"] }
