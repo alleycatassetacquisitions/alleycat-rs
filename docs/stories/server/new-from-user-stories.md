@@ -1,6 +1,6 @@
 # New Server Stories From Alleycat User Stories
 
-These stories come from the Google Doc narrative and do not appear to have a direct equivalent in the neighboring `/Users/danshari/projects/alleycat` implementation. Some may build on translated primitives like players, matches, FDN box state, reader events, and generic missions.
+These stories come from the Google Doc narrative and do not appear to have a direct equivalent in the old codebase at `/Users/danshari/projects/alleycat-server-bun`. Some may build on translated primitives like players, matches, FDN box state, reader events, and generic missions.
 
 ## Returning Asset Reissue
 
@@ -229,4 +229,3 @@ so that the whole event can collaborate on defeating a major target.
 - [ ] Exposes current boss health for display or device output.
 - [ ] Records final defeat.
 - [ ] Supports related awards or announcements.
-
