@@ -6,7 +6,7 @@ VALUES
     (
         '10000000-0000-4000-8000-000000000001',
         '0101',
-        'Avery Chen',
+        'Nyx Voltage',
         'hunter',
         'avery@example.test',
         now() - interval '45 days'
@@ -14,7 +14,7 @@ VALUES
     (
         '10000000-0000-4000-8000-000000000002',
         '0202',
-        'Jordan Brooks',
+        'Rook Zero',
         'bounty',
         'jordan@example.test',
         now() - interval '20 days'
@@ -22,7 +22,7 @@ VALUES
     (
         '10000000-0000-4000-8000-000000000003',
         '0303',
-        'Riley Morgan',
+        'Echo Vane',
         'unassigned',
         NULL,
         now() - interval '7 days'
@@ -30,7 +30,7 @@ VALUES
     (
         '10000000-0000-4000-8000-000000000004',
         '0404',
-        'Sam Patel',
+        'Chrome Wraith',
         'hunter',
         'sam@example.test',
         now() - interval '2 days'
@@ -38,7 +38,7 @@ VALUES
     (
         '10000000-0000-4000-8000-000000000005',
         '0505',
-        'Taylor Nguyen',
+        'Nova Static',
         'bounty',
         'taylor@example.test',
         now() - interval '4 hours'
