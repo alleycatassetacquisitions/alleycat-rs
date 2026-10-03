@@ -1,4 +1,4 @@
-use crate::env::read_env_file;
+use crate::env::read_project_env;
 use crate::project::project_root;
 use anyhow::{Context, Result, bail};
 use std::process::{Command, Stdio};
@@ -47,7 +47,7 @@ pub fn run() -> Result<()> {
         bail!("Docker Compose failed with {status}");
     }
 
-    let values = read_env_file(project_root.join(".env"))?;
+    let values = read_project_env()?;
 
     let app_port = values
         .get("APP_PORT")
@@ -56,7 +56,7 @@ pub fn run() -> Result<()> {
 
     println!("Local instance is starting.");
     println!("Health check: curl -i http://localhost:{app_port}/health_check");
-    println!("API logs: scripts/view_logs.sh");
+    println!("API logs: cargo xtask stack logs");
 
     Ok(())
 }

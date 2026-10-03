@@ -58,7 +58,7 @@ scripts/seed_db.sh
 
 ```bash
 # Follow API logs.
-scripts/view_logs.sh
+cargo xtask stack logs
 
 # Stop the containers while preserving the database.
 docker compose stop
@@ -66,6 +66,16 @@ docker compose stop
 # Build and start (checks whether a database reset is required).
 cargo xtask stack start
 ```
+
+`stack logs` streams raw app logs without Compose colors or prefixes. You can
+pipe them to a tool of your choice. For readable formatting with Bunyan:
+
+```bash
+cargo install bunyan # Optional, one-time installation.
+cargo xtask stack logs | bunyan
+```
+
+Press Ctrl+C to stop following logs; the app keeps running.
 
 `stack start` checks prerequisites, builds the images, and starts PostgreSQL to
 check migration status before starting the rest of the stack. A fresh database

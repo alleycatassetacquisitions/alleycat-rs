@@ -17,7 +17,7 @@ Click a command to edit its Rust file; click its script to see the behavior to p
 | [stack db seed](xtask/src/stack/db/seed.rs) | Partial: Compose seeding works; friendly preflight checks remain. | [seed_db.sh](scripts/seed_db.sh), Compose branch |
 | [stack db backup](xtask/src/stack/db/backup.rs) | TBD | [backup_db.sh](scripts/backup_db.sh) |
 | [stack db reset](xtask/src/stack/db/reset.rs) | Ready | Confirms deletion, tears down the local stack and volumes, then builds, starts, migrates, and seeds. No backup. |
-| [stack logs](xtask/src/stack/logs/follow.rs) | TBD | [view_logs.sh](scripts/view_logs.sh) |
+| [stack logs](xtask/src/stack/logs/follow.rs) | Ready | Streams raw app logs without Compose colors or prefixes; pipe to a formatter if desired. |
 | [stack logs backup](xtask/src/stack/logs/backup.rs) | TBD | [backup_logs.sh](scripts/backup_logs.sh) |
 | [stack delete](xtask/src/stack/delete.rs) | Partial: confirmation only; then reports not implemented. | [delete_local_instance.sh](scripts/delete_local_instance.sh) |
 | [native db init](xtask/src/native/db/init.rs) | TBD | [init_db.sh](scripts/init_db.sh), including migrations |
@@ -42,7 +42,7 @@ Shared code: [process helpers](xtask/src/command.rs), [environment](xtask/src/en
 ## Porting notes
 
 The existing seed script reads [xtask/seed_db.sql](xtask/seed_db.sql). Startup
-instructions use `cargo xtask stack start`; logs still use the working script.
+instructions use `cargo xtask stack start`; follow logs with `cargo xtask stack logs`.
 
 Keep migrations within startup, native initialization, and cloud reset for now.
 `stack start` builds images before starting the containers. Stop remains

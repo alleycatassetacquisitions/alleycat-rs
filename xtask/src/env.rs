@@ -1,8 +1,24 @@
-use anyhow::{Result, anyhow};
+use crate::project::project_root;
+use anyhow::{Context, Result, anyhow, bail};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-pub(crate) fn read_env_file(path: impl AsRef<Path>) -> Result<HashMap<String, String>> {
+pub(crate) fn env_path() -> Result<PathBuf> {
+    Ok(project_root()?.join(".env"))
+}
+
+pub(crate) fn check_env() -> Result<()> {
+    if !env_path()?.try_exists().context("could not inspect .env")? {
+        bail!("Missing .env. Create it with: cp .env.example .env");
+    }
+    Ok(())
+}
+
+pub(crate) fn read_project_env() -> Result<HashMap<String, String>> {
+    read_env_file(env_path()?)
+}
+
+fn read_env_file(path: impl AsRef<Path>) -> Result<HashMap<String, String>> {
     dotenvy::from_path_iter(path)
         .and_then(|values| values.collect())
         // Raw dotenv errors can include credentials from the offending line.

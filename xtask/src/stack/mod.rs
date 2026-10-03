@@ -18,7 +18,7 @@ pub enum Command {
     Start,
     /// Back up and delete the local stack and its volume (not implemented yet).
     Delete,
-    /// Follow or back up API logs (not implemented yet).
+    /// Follow API logs (log backups are not implemented yet).
     Logs {
         #[command(subcommand)]
         command: Option<logs::Command>,

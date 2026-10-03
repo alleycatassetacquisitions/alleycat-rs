@@ -1,7 +1,6 @@
 use crate::command::command_output;
-use crate::env::read_env_file;
+use crate::env::{check_env, read_project_env};
 use anyhow::{Result, bail};
-use std::path::Path;
 
 pub fn run() -> Result<()> {
     let checks = [
@@ -9,7 +8,7 @@ pub fn run() -> Result<()> {
         check_docker_cli(),
         check_docker_compose(),
         check_docker_running(),
-        check_env(),
+        check_env_file(),
         check_env_keys(),
     ];
 
@@ -112,25 +111,17 @@ fn check_docker_running() -> CheckResult {
     }
 }
 
-fn check_env() -> CheckResult {
-    let path = Path::new(".env");
-    match path.try_exists() {
-        Ok(true) => CheckResult {
+fn check_env_file() -> CheckResult {
+    match check_env() {
+        Ok(()) => CheckResult {
             name: "Environment File",
             outcome: CheckOutcome::Pass("environment file exists".to_owned()),
-        },
-        Ok(false) => CheckResult {
-            name: "Environment File",
-            outcome: CheckOutcome::Fail {
-                detail: "No .env file found".to_owned(),
-                fix: "Copy .env.example to .env and set values for deployment.",
-            },
         },
         Err(error) => CheckResult {
             name: "Environment File",
             outcome: CheckOutcome::Fail {
-                detail: format!("cound not inspect .env: {error}"),
-                fix: "Check directory permissions.",
+                detail: format!("{error:#}"),
+                fix: "Ensure the project's .env file exists and is accessible.",
             },
         },
     }
@@ -139,7 +130,7 @@ fn check_env() -> CheckResult {
 fn check_env_keys() -> CheckResult {
     const REQUIRED_KEYS: [&str; 3] = ["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"];
 
-    let values = match read_env_file(".env") {
+    let values = match read_project_env() {
         Ok(values) => values,
         Err(error) => {
             return CheckResult {

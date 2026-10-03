@@ -1,11 +1,22 @@
-//! Replace scripts/view_logs.sh by following the Compose app service logs.
-//! Run from project_root() with the same environment handling as other stack tasks.
-//! Pipe logs without color or log prefixes through Bunyan when it is installed;
-//! otherwise explain the fallback and stream raw Compose logs.
-//! Stream rather than buffer, handle interruption, and propagate process failures.
-
-use anyhow::{Result, bail};
+use crate::project::project_root;
+use anyhow::{Context, Result, bail};
+use std::process::Command;
 
 pub fn run() -> Result<()> {
-    bail!("stack logs is not implemented yet")
+    let status = Command::new("docker")
+        .current_dir(project_root()?)
+        .args([
+            "compose",
+            "logs",
+            "--no-color",
+            "--no-log-prefix",
+            "-f",
+            "app",
+        ])
+        .status()
+        .context("could not follow Docker Compose logs")?;
+    if !status.success() {
+        bail!("Docker Compose logs failed with {status}");
+    }
+    Ok(())
 }
