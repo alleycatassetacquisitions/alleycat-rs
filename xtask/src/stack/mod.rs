@@ -7,13 +7,14 @@ mod db;
 mod delete;
 mod doctor;
 mod logs;
+mod migration_check;
 mod start;
 
 #[derive(Subcommand)]
 pub enum Command {
     /// Check requirements for the local Compose stack.
     Doctor,
-    /// Start the local Compose stack.
+    /// Build and start the local Compose stack.
     Start,
     /// Back up and delete the local stack and its volume (not implemented yet).
     Delete,

@@ -16,6 +16,7 @@ Click a command to edit its Rust file; click its script to see the behavior to p
 | [stack start](xtask/src/stack/start.rs) | Ready | [start_local_instance.sh (before deletion)](https://github.com/alleycatassetacquisitions/alleycat-rs/blob/e4cea9d54dc8a43dfb794431884472c58fbe6368/scripts/start_local_instance.sh) |
 | [stack db seed](xtask/src/stack/db/seed.rs) | Partial: Compose seeding works; friendly preflight checks remain. | [seed_db.sh](scripts/seed_db.sh), Compose branch |
 | [stack db backup](xtask/src/stack/db/backup.rs) | TBD | [backup_db.sh](scripts/backup_db.sh) |
+| [stack db reset](xtask/src/stack/db/reset.rs) | Ready | Confirms deletion, tears down the local stack and volumes, then builds, starts, migrates, and seeds. No backup. |
 | [stack logs](xtask/src/stack/logs/follow.rs) | TBD | [view_logs.sh](scripts/view_logs.sh) |
 | [stack logs backup](xtask/src/stack/logs/backup.rs) | TBD | [backup_logs.sh](scripts/backup_logs.sh) |
 | [stack delete](xtask/src/stack/delete.rs) | Partial: confirmation only; then reports not implemented. | [delete_local_instance.sh](scripts/delete_local_instance.sh) |
@@ -44,7 +45,13 @@ The existing seed script reads [xtask/seed_db.sql](xtask/seed_db.sql). Startup
 instructions use `cargo xtask stack start`; logs still use the working script.
 
 Keep migrations within startup, native initialization, and cloud reset for now.
-Build and stop remain `docker compose build` and `docker compose stop`.
+`stack start` builds images before starting the containers. Stop remains
+`docker compose stop`.
+Startup runs `sqlx migrate info` after starting PostgreSQL and before running
+migrations or starting the app. A mix of `/installed` and `/pending` statuses
+requires `cargo xtask stack db reset`. Only pending migrations are treated as a
+fresh database and initialize normally, including after reset. Only installed
+migrations allow startup with existing data.
 When porting SQLx preparation, note that its script resets the native DB first;
 that destructive step should remain explicit in the task's behavior.
 Follow [AGENTS.md](AGENTS.md) for the remote reset inventory. Never run remote

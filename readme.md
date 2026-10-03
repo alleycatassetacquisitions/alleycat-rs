@@ -37,7 +37,6 @@ cargo xtask stack doctor
 Build and start the containers:
 
 ```bash
-docker compose build
 cargo xtask stack start
 ```
 
@@ -64,19 +63,34 @@ scripts/view_logs.sh
 # Stop the containers while preserving the database.
 docker compose stop
 
-# Start them again and apply pending migrations.
+# Build and start (checks whether a database reset is required).
 cargo xtask stack start
 ```
 
-Compose uses built images rather than live source files. After pulling or
-changing application code, rebuild before restarting:
+`stack start` checks prerequisites, builds the images, and starts PostgreSQL to
+check migration status before starting the rest of the stack. A fresh database
+is migrated automatically. Startup uses SQLx statuses: only pending migrations
+are treated as fresh; a mix of installed and pending migrations blocks startup
+and asks you to run `cargo xtask stack db reset`.
+If the database is up to date, startup preserves its data.
+After pulling or changing application code, run:
 
 ```bash
-docker compose build
 cargo xtask stack start
 ```
 
 PostgreSQL data remains in a Docker volume when the containers stop.
+To delete all local database data, rebuild the stack, apply all migrations, and
+load sample data, run:
+
+```bash
+cargo xtask stack db reset
+```
+
+This requires typing `reset` to confirm and does not make a backup. Use it only
+for disposable local data. Updates with new migrations require this reset;
+updates without pending migrations only need `cargo xtask stack start`.
+
 `scripts/delete_local_instance.sh` asks for confirmation, backs up logs and the
 database, and then deletes the local containers and database volume.
 

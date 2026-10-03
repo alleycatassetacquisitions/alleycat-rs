@@ -8,6 +8,28 @@ pub fn run() -> Result<()> {
 
     let project_root = project_root()?;
 
+    let status = Command::new("docker")
+        .args(["compose", "build"])
+        .current_dir(project_root)
+        .status()
+        .context("could not run Docker Compose build")?;
+
+    if !status.success() {
+        bail!("Docker Compose build failed with {status}");
+    }
+
+    // Start only PostgreSQL so no migrations run before the reset policy check.
+    let status = Command::new("docker")
+        .args(["compose", "up", "-d", "--wait", "postgres"])
+        .current_dir(project_root)
+        .status()
+        .context("could not start PostgreSQL for migration checks")?;
+    if !status.success() {
+        bail!("PostgreSQL startup failed with {status}");
+    }
+
+    super::migration_check::run()?;
+
     let _ = Command::new("docker")
         .args(["compose", "rm", "-f", "migrate"])
         .current_dir(project_root)
