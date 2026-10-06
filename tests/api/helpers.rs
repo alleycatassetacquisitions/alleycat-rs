@@ -121,3 +121,25 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
 
     connection_pool
 }
+
+// Player tests opt in to an event; a freshly migrated database has none.
+pub async fn spawn_app_with_event() -> TestApp {
+    let app = spawn_app().await;
+    activate_new_event(&app).await;
+    app
+}
+
+pub async fn activate_new_event(app: &TestApp) -> Uuid {
+    let id = Uuid::new_v4();
+    sqlx::query("INSERT INTO events (id, name, created_at) VALUES ($1, 'Test event', now())")
+        .bind(id)
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE app_state SET active_event_id = $1 WHERE id = 1")
+        .bind(id)
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+    id
+}

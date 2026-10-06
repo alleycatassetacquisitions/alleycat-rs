@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE events SET next_pdn_code = $2::text::integer + 1 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0dc752c27b3f4dd409cbd22c0c8f3069ad70f5a96c4786033d2b82cd945b2b7e"
+}

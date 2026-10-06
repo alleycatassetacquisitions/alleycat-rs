@@ -54,6 +54,14 @@ logs:
 scripts/seed_db.sh
 ```
 
+The seed creates a development event and selects it only if no event is active.
+Players are registered and listed within the active event. A fresh, unseeded
+database has no active event: player registration returns `409 Conflict` and
+player listing is empty. Event management endpoints are not implemented yet.
+Registration also returns `409 Conflict` for a duplicate name within the active
+event or exhausted PDN codes. Codes are allocated sequentially, skipping reserved
+and already assigned values.
+
 ## Routine commands
 
 ```bash
@@ -105,6 +113,11 @@ updates without pending migrations only need `cargo xtask stack start`.
 database, and then deletes the local containers and database volume.
 
 ## Native development
+
+API database connections limit each lock wait to 3 seconds and each SQL statement
+to 10 seconds. PostgreSQL terminates connections left idle in an open transaction
+for 30 seconds. These defaults are set in `src/startup.rs` for the API pool;
+migration and maintenance connections do not inherit them from the application.
 
 For API development outside Compose, initialize the standalone development
 database and run the server:

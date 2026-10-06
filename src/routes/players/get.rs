@@ -1,4 +1,5 @@
 use crate::domain::PlayerMode;
+use crate::events::get_active_event_id;
 use actix_web::{error::ErrorInternalServerError, web};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -66,6 +67,9 @@ async fn fetch_players(
     page: u32,
     per_page: u32,
 ) -> Result<Vec<PlayerResponse>, sqlx::Error> {
+    let Some(event_id) = get_active_event_id(pool).await? else {
+        return Ok(Vec::new());
+    };
     let limit = i64::from(per_page);
     let offset = i64::from(page - 1) * limit;
     sqlx::query_as!(
@@ -75,11 +79,13 @@ async fn fetch_players(
             id, pdn_code, name, created_at,
             mode AS "mode: PlayerMode"
         FROM players
+        WHERE event_id = $3
         ORDER BY created_at DESC, id DESC
         LIMIT $1 OFFSET $2
         "#,
         limit,
-        offset
+        offset,
+        event_id
     )
     .fetch_all(pool)
     .await
