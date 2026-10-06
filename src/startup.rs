@@ -1,6 +1,7 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::routes::{
-    get_device_logs, get_players, health_check, register_player, write_device_log,
+    VersionInfo, get_device_logs, get_players, get_version, health_check, register_player,
+    write_device_log,
 };
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
@@ -33,15 +34,18 @@ pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
 
 pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
+    let version = web::Data::new(VersionInfo::from_environment());
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
             .route("/health_check", web::get().to(health_check))
+            .route("/version", web::get().to(get_version))
             .route("/device-logs", web::get().to(get_device_logs))
             .route("/device-logs", web::post().to(write_device_log))
             .route("/players", web::get().to(get_players))
             .route("/players", web::post().to(register_player))
             .app_data(db_pool.clone())
+            .app_data(version.clone())
     })
     .listen(listener)?
     .run();

@@ -64,6 +64,14 @@ and already assigned values.
 
 ## Routine commands
 
+### Identify a deployment
+
+`GET /version` returns the deployed commit SHA and its GitHub URL. Missing commit
+metadata returns null for both fields; a missing repository URL returns null for
+`commit_url` only.
+
+### Manage the local stack
+
 ```bash
 # Follow API logs.
 cargo xtask stack logs
