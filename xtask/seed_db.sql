@@ -1,9 +1,21 @@
 BEGIN;
 
+INSERT INTO events (id, name, created_at)
+VALUES ('20000000-0000-4000-8000-000000000001', 'Development event', now())
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE app_state
+SET active_event_id = '20000000-0000-4000-8000-000000000001'
+WHERE id = 1 AND active_event_id IS NULL;
+
+-- Coordinate with registration before changing this event's players/counter.
+SELECT id FROM events WHERE id = '20000000-0000-4000-8000-000000000001' FOR UPDATE;
+
 -- Stable IDs make the development fixtures safe to update and run repeatedly.
-INSERT INTO players (id, pdn_code, name, mode, email, created_at)
+INSERT INTO players (event_id, id, pdn_code, name, mode, email, created_at)
 VALUES
     (
+        '20000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000001',
         '0101',
         'Nyx Voltage',
@@ -12,6 +24,7 @@ VALUES
         now() - interval '45 days'
     ),
     (
+        '20000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000002',
         '0202',
         'Rook Zero',
@@ -20,6 +33,7 @@ VALUES
         now() - interval '20 days'
     ),
     (
+        '20000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000003',
         '0303',
         'Echo Vane',
@@ -28,6 +42,7 @@ VALUES
         now() - interval '7 days'
     ),
     (
+        '20000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000004',
         '0404',
         'Chrome Wraith',
@@ -36,6 +51,7 @@ VALUES
         now() - interval '2 days'
     ),
     (
+        '20000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000005',
         '0505',
         'Nova Static',
@@ -44,25 +60,20 @@ VALUES
         now() - interval '4 hours'
     )
 ON CONFLICT (id) DO UPDATE SET
+    event_id = EXCLUDED.event_id,
     pdn_code = EXCLUDED.pdn_code,
     name = EXCLUDED.name,
     mode = EXCLUDED.mode,
     email = EXCLUDED.email,
     created_at = EXCLUDED.created_at;
 
--- Registration draws from this table, so seeded codes must not remain available.
-DELETE FROM available_pdn_codes
-WHERE code IN (
-    SELECT pdn_code
-    FROM players
-    WHERE id IN (
-        '10000000-0000-4000-8000-000000000001',
-        '10000000-0000-4000-8000-000000000002',
-        '10000000-0000-4000-8000-000000000003',
-        '10000000-0000-4000-8000-000000000004',
-        '10000000-0000-4000-8000-000000000005'
-    )
-);
+-- Never rewind the allocation counter when fixtures are reapplied.
+UPDATE events
+SET next_pdn_code = GREATEST(next_pdn_code, (
+    SELECT COALESCE(MAX(pdn_code::integer), 0) + 1
+    FROM players WHERE event_id = events.id
+))
+WHERE id = '20000000-0000-4000-8000-000000000001';
 
 INSERT INTO device_logs (
     device_mac,

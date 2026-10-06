@@ -21,7 +21,14 @@ pub async fn build(configuration: Settings) -> Result<Server, std::io::Error> {
 }
 
 pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
-    PgPoolOptions::new().connect_lazy_with(configuration.connection_options())
+    // Apply these defaults to every API connection, including replacements.
+    // Migration and maintenance connections use the base options separately.
+    let options = configuration.connection_options().options([
+        ("lock_timeout", "3s"),
+        ("statement_timeout", "10s"),
+        ("idle_in_transaction_session_timeout", "30s"),
+    ]);
+    PgPoolOptions::new().connect_lazy_with(options)
 }
 
 pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Error> {
