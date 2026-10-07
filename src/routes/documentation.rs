@@ -1,6 +1,6 @@
 use actix_web::{HttpResponse, web};
 use utoipa::openapi::{Info, OpenApi};
-use utoipa_redoc::{Redoc, Servable};
+use utoipa_redoc::Redoc;
 
 pub fn configure_documentation(config: &mut web::ServiceConfig, mut api: OpenApi) {
     api.info = Info::new("Alleycat API", env!("CARGO_PKG_VERSION"));
@@ -10,14 +10,21 @@ pub fn configure_documentation(config: &mut web::ServiceConfig, mut api: OpenApi
             .into(),
     );
     config
-        .service(
-            Redoc::with_url("/docs", "/openapi.json")
-                .custom_html(include_str!("../../static/redoc/index.html")),
-        )
+        .route("/docs", web::get().to(redoc_page))
         .route("/docs/redoc.js", web::get().to(redoc_script))
         .route("/docs/redoc-logo.svg", web::get().to(redoc_logo))
         .route("/openapi.json", web::get().to(openapi))
         .app_data(web::Data::new(api));
+}
+
+async fn redoc_page() -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(
+            Redoc::new("/openapi.json")
+                .custom_html(include_str!("../../static/redoc/index.html"))
+                .to_html(),
+        )
 }
 
 async fn redoc_script() -> HttpResponse {
