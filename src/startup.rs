@@ -1,7 +1,7 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::routes::{
-    VersionInfo, get_device_logs, get_players, get_version, health_check, register_player,
-    write_device_log,
+    VersionInfo, create_event, get_device_logs, get_players, get_version, health_check,
+    register_player, set_active_event, update_event, write_device_log,
 };
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
@@ -44,6 +44,9 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
             .route("/device-logs", web::post().to(write_device_log))
             .route("/players", web::get().to(get_players))
             .route("/players", web::post().to(register_player))
+            .route("/events", web::post().to(create_event))
+            .route("/events/{id}", web::patch().to(update_event))
+            .route("/events/{id}/active", web::put().to(set_active_event))
             .app_data(db_pool.clone())
             .app_data(version.clone())
     })
