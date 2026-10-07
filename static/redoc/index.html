@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Alleycat API documentation</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <noscript>Enable JavaScript to view the documentation, or download <a href="/openapi.json">the OpenAPI specification</a>.</noscript>
+    <div id="redoc-container"></div>
+    <script src="/docs/redoc.js"></script>
+    <script>
+      Redoc.init($spec, Object.assign({}, $config, {
+        theme: {
+          typography: {
+            fontFamily: "system-ui, sans-serif",
+            headings: { fontFamily: "system-ui, sans-serif" },
+            code: { fontFamily: "ui-monospace, monospace" }
+          }
+        }
+      }), document.getElementById("redoc-container"));
+    </script>
+  </body>
+</html>

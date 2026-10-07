@@ -1,7 +1,7 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::routes::{
-    VersionInfo, create_event, get_device_logs, get_players, get_version, health_check,
-    register_player, set_active_event, update_event, write_device_log,
+    VersionInfo, configure_documentation, create_event, get_device_logs, get_players, get_version,
+    health_check, register_player, set_active_event, update_event, write_device_log,
 };
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
@@ -9,6 +9,7 @@ use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
+use utoipa_actix_web::AppExt;
 
 pub async fn build(configuration: Settings) -> Result<Server, std::io::Error> {
     let connection_pool = get_connection_pool(&configuration.database);
@@ -36,17 +37,20 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
     let db_pool = web::Data::new(db_pool);
     let version = web::Data::new(VersionInfo::from_environment());
     let server = HttpServer::new(move || {
-        App::new()
+        let (app, api) = App::new()
             .wrap(TracingLogger::default())
-            .route("/health_check", web::get().to(health_check))
-            .route("/version", web::get().to(get_version))
-            .route("/device-logs", web::get().to(get_device_logs))
-            .route("/device-logs", web::post().to(write_device_log))
-            .route("/players", web::get().to(get_players))
-            .route("/players", web::post().to(register_player))
-            .route("/events", web::post().to(create_event))
-            .route("/events/{id}", web::patch().to(update_event))
-            .route("/events/{id}/active", web::put().to(set_active_event))
+            .into_utoipa_app()
+            .service(health_check)
+            .service(get_version)
+            .service(get_device_logs)
+            .service(write_device_log)
+            .service(get_players)
+            .service(register_player)
+            .service(create_event)
+            .service(update_event)
+            .service(set_active_event)
+            .split_for_parts();
+        app.configure(|config| configure_documentation(config, api))
             .app_data(db_pool.clone())
             .app_data(version.clone())
     })

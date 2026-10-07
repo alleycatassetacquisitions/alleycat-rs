@@ -1,5 +1,10 @@
 # Repository guidance
 
+## API documentation
+
+- Update OpenAPI annotations alongside API changes.
+- Keep ReDoc self-contained: local assets and system fonts, no CDN dependencies.
+
 ## Old codebase
 
 - For this project, "the old codebase" refers to the Hono/Bun server in

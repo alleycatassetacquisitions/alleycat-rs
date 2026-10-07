@@ -12,7 +12,7 @@ pub struct Player {
     pub mode: PlayerMode,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, utoipa::ToSchema)]
 #[sqlx(type_name = "player_mode", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum PlayerMode {

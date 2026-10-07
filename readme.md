@@ -62,6 +62,11 @@ Registration also returns `409 Conflict` for a duplicate name within the active
 event or exhausted PDN codes. Codes are allocated sequentially, skipping reserved
 and already assigned values.
 
+## API documentation
+
+Open `/docs` on the running server to browse the API in ReDoc. The OpenAPI
+specification is available at `/openapi.json` (the AI friendly format).
+
 ## Routine commands
 
 ### Identify a deployment

@@ -1,20 +1,22 @@
 use actix_web::{HttpResponse, error, web};
+use actix_web::{patch, post, put};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateEvent {
     name: String,
     venue_name: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpdateEvent {
     #[serde(default, deserialize_with = "present")]
+    #[schema(nullable = false)]
     name: Option<String>,
     // Missing preserves the venue; explicit null clears it.
     #[serde(default, deserialize_with = "present")]
@@ -29,7 +31,7 @@ where
     T::deserialize(deserializer).map(Some)
 }
 
-#[derive(Serialize, sqlx::FromRow)]
+#[derive(Serialize, sqlx::FromRow, utoipa::ToSchema)]
 struct EventResponse {
     id: Uuid,
     name: String,
@@ -60,6 +62,15 @@ fn database_error(error: sqlx::Error) -> actix_web::Error {
     error::ErrorInternalServerError("Event operation failed")
 }
 
+#[utoipa::path(
+    tag = "Events", summary = "Create an event",
+    description = "Creates an event without making it active. Names are trimmed and must be nonblank. Names and venues cannot contain null characters.",
+    request_body(content = CreateEvent, example = json!({"name": "Alleycat 2026", "venue_name": "Main Hall"})),
+    responses((status = 201, description = "Event created", body = EventResponse),
+        (status = 400, description = "Invalid JSON, unknown fields, or invalid name/venue"),
+        (status = 500, description = "Database operation failed"))
+)]
+#[post("/events")]
 pub async fn create_event(
     body: web::Json<CreateEvent>,
     pool: web::Data<PgPool>,
@@ -80,6 +91,17 @@ pub async fn create_event(
     Ok(HttpResponse::Created().json(event))
 }
 
+#[utoipa::path(
+    tag = "Events", summary = "Update an event",
+    description = "Supply at least one field. Omitted fields stay unchanged. venue_name may be null to clear it; name cannot be null or blank. Names are trimmed; null characters are rejected.",
+    params(("id" = Uuid, Path, description = "Event ID")),
+    request_body(content = UpdateEvent, example = json!({"venue_name": null})),
+    responses((status = 200, description = "Updated event", body = EventResponse),
+        (status = 400, description = "Invalid body or no fields supplied"),
+        (status = 404, description = "Event not found or invalid event ID"),
+        (status = 500, description = "Database operation failed"))
+)]
+#[patch("/events/{id}")]
 pub async fn update_event(
     id: web::Path<Uuid>,
     body: web::Json<UpdateEvent>,
@@ -110,6 +132,15 @@ pub async fn update_event(
     Ok(HttpResponse::Ok().json(event))
 }
 
+#[utoipa::path(
+    tag = "Events", summary = "Select the active event",
+    description = "Subsequent player registrations and player listings use this event. An unknown event leaves the current selection unchanged.",
+    params(("id" = Uuid, Path, description = "Event ID")),
+    responses((status = 204, description = "Active event selected; empty body"),
+        (status = 404, description = "Event not found or invalid event ID"),
+        (status = 500, description = "Database operation failed"))
+)]
+#[put("/events/{id}/active")]
 pub async fn set_active_event(
     id: web::Path<Uuid>,
     pool: web::Data<PgPool>,

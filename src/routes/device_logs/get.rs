@@ -1,16 +1,17 @@
+use actix_web::get;
 use actix_web::{error::ErrorInternalServerError, web};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct GetDeviceLogsQuery {
     page: Option<u32>,
     per_page: Option<u32>,
 }
 
-#[derive(Serialize, sqlx::FromRow)]
+#[derive(Serialize, sqlx::FromRow, utoipa::ToSchema)]
 struct DeviceLogResponse {
     id: Uuid,
     device_mac: String,
@@ -24,18 +25,30 @@ struct DeviceLogResponse {
     task_name: Option<String>,
 }
 
-#[derive(Serialize)]
-struct Pagination {
+#[derive(Serialize, utoipa::ToSchema)]
+struct DeviceLogPagination {
     page: u32,
     per_page: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct GetDeviceLogsResponse {
     device_logs: Vec<DeviceLogResponse>,
-    pagination: Pagination,
+    pagination: DeviceLogPagination,
 }
 
+#[utoipa::path(
+    tag = "Device logs", summary = "List device crash reports",
+    description = "Returns reports across all devices, newest first.",
+    params(
+        ("page" = Option<u32>, Query, description = "Page number; defaults to 1. Zero is treated as 1."),
+        ("per_page" = Option<u32>, Query, description = "Page size; defaults to 20 and is clamped to 1–100.")
+    ),
+    responses((status = 200, description = "Device logs and effective pagination", body = GetDeviceLogsResponse),
+        (status = 400, description = "Invalid pagination query"),
+        (status = 500, description = "Database operation failed"))
+)]
+#[get("/device-logs")]
 #[tracing::instrument(name = "Retrieve device logs", skip(parameters, pool))]
 pub async fn get_device_logs(
     parameters: web::Query<GetDeviceLogsQuery>,
@@ -60,7 +73,7 @@ pub async fn get_device_logs(
 
     Ok(web::Json(GetDeviceLogsResponse {
         device_logs,
-        pagination: Pagination { page, per_page },
+        pagination: DeviceLogPagination { page, per_page },
     }))
 }
 

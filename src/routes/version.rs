@@ -1,7 +1,8 @@
+use actix_web::get;
 use actix_web::{HttpResponse, web};
 
 /// Deployment metadata captured once, before the server starts.
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 pub struct VersionInfo {
     commit: Option<String>,
     commit_url: Option<String>,
@@ -25,6 +26,11 @@ impl VersionInfo {
     }
 }
 
+#[utoipa::path(
+    tag = "System", summary = "Get deployment version",
+    responses((status = 200, description = "Deployment metadata; fields are null when unavailable. Cache-Control: no-store.", body = VersionInfo))
+)]
+#[get("/version")]
 pub async fn get_version(info: web::Data<VersionInfo>) -> HttpResponse {
     HttpResponse::Ok()
         .insert_header(("Cache-Control", "no-store"))
@@ -66,7 +72,7 @@ mod tests {
         let app = actix_test::init_service(
             App::new()
                 .app_data(web::Data::new(info))
-                .route("/version", web::get().to(get_version)),
+                .service(get_version),
         )
         .await;
         let response = actix_test::call_service(

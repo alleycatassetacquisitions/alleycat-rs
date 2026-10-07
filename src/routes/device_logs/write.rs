@@ -1,8 +1,24 @@
 use crate::proto::alleycat::device::WriteDeviceLogRequest;
 use actix_web::http::header::CONTENT_TYPE;
+use actix_web::post;
 use actix_web::{HttpRequest, HttpResponse, error, web};
 use prost::Message;
 use sqlx::PgPool;
+
+// Describe the wire payload as binary, rather than a JSON array of byte values.
+struct ProtobufBody;
+
+impl utoipa::PartialSchema for ProtobufBody {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::{KnownFormat, ObjectBuilder, SchemaFormat, Type};
+        ObjectBuilder::new()
+            .schema_type(Type::String)
+            .format(Some(SchemaFormat::KnownFormat(KnownFormat::Binary)))
+            .into()
+    }
+}
+
+impl utoipa::ToSchema for ProtobufBody {}
 
 struct NewDeviceLog {
     device_mac: sqlx::types::mac_address::MacAddress,
@@ -47,6 +63,16 @@ impl TryFrom<WriteDeviceLogRequest> for NewDeviceLog {
     }
 }
 
+#[utoipa::path(
+    tag = "Device logs", summary = "Submit a device crash report",
+    description = "Send a binary alleycat.device.WriteDeviceLogRequest encoded using proto/device_api.proto. Required fields: device_mac (48-bit MAC address), crash_number, uptime_ms, reset_reason. crash_number and uptime_ms must fit a signed 64-bit integer; reset_reason must fit a signed 32-bit integer. Optional fields: software_version, program_counter, exception_cause, task_name. Repeated (device_mac, crash_number) reports are ignored and still return 204.",
+    request_body(content = inline(ProtobufBody), content_type = "application/protobuf"),
+    responses((status = 204, description = "Report accepted; empty body"),
+        (status = 400, description = "Invalid protobuf or missing/invalid report fields"),
+        (status = 415, description = "Expected application/protobuf"),
+        (status = 500, description = "Database operation failed"))
+)]
+#[post("/device-logs")]
 pub async fn write_device_log(
     http_request: HttpRequest,
     body: web::Bytes,

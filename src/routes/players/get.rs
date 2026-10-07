@@ -1,18 +1,19 @@
 use crate::domain::PlayerMode;
 use crate::events::get_active_event_id;
+use actix_web::get;
 use actix_web::{error::ErrorInternalServerError, web};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct GetPlayersQuery {
     page: Option<u32>,
     per_page: Option<u32>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct PlayerResponse {
     id: Uuid,
     pdn_code: String,
@@ -21,18 +22,30 @@ struct PlayerResponse {
     mode: PlayerMode,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct Pagination {
     page: u32,
     per_page: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct GetPlayersResponse {
     players: Vec<PlayerResponse>,
     pagination: Pagination,
 }
 
+#[utoipa::path(
+    tag = "Players", summary = "List players in the active event",
+    description = "Newest first. Returns an empty list when no event is active.",
+    params(
+        ("page" = Option<u32>, Query, description = "Page number; defaults to 1. Zero is treated as 1."),
+        ("per_page" = Option<u32>, Query, description = "Page size; defaults to 20 and is clamped to 1–100.")
+    ),
+    responses((status = 200, description = "Players and effective pagination", body = GetPlayersResponse),
+        (status = 400, description = "Invalid pagination query"),
+        (status = 500, description = "Database operation failed"))
+)]
+#[get("/players")]
 #[tracing::instrument(name = "Retrieve players", skip(parameters))]
 pub async fn get_players(
     parameters: web::Query<GetPlayersQuery>,
