@@ -17,6 +17,10 @@
 
 ## Database migrations
 
+- Whenever a migration is added or changed, run `cargo xtask docs db` with
+  Docker running and include any regenerated changes to
+  `docs/database/README.md` and `docs/database/schema.sql` in the same change.
+  Do not edit these generated files manually.
 - `scripts/reset_remote_db.sh` resets the disposable DigitalOcean database by
   explicitly dropping every application schema object created by `migrations/`,
   plus SQLx's `_sqlx_migrations` ledger.

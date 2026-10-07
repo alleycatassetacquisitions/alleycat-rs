@@ -67,6 +67,12 @@ and already assigned values.
 Open `/docs` on the running server to browse the API in ReDoc. The OpenAPI
 specification is available at `/openapi.json` (the AI friendly format).
 
+## Database documentation
+
+The auto-generated [database schema reference](docs/database/README.md) is primarily
+for AI consumption at the moment. It documents tables, relationships, and
+constraints to help coding agents understand the current database structure.
+
 ## Routine commands
 
 ### Identify a deployment

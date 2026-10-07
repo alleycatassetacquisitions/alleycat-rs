@@ -1,5 +1,6 @@
 mod cloud;
 mod command;
+mod docs;
 mod env;
 mod native;
 mod project;
@@ -18,6 +19,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Generate documentation from the repository's migrations.
+    Docs {
+        #[command(subcommand)]
+        command: docs::Command,
+    },
     /// Commands for host-native development.
     Native {
         #[command(subcommand)]
@@ -44,6 +50,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Command::Docs { command } => docs::run(command),
         Command::Native { command } => native::run(command),
         Command::Stack { command } => stack::run(command),
         Command::Cloud { command } => cloud::run(command),
