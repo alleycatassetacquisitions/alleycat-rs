@@ -14,8 +14,10 @@ DROP TABLE IF EXISTS
 CASCADE;
 
 -- Remove application-defined PostgreSQL types after their tables are gone.
+-- Include the legacy name for databases that have not applied the team rename.
 DROP TYPE IF EXISTS
     player_role,
+    player_team,
     player_mode
 CASCADE;
 COMMIT;

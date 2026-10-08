@@ -33,7 +33,7 @@ async fn player_is_retrieved_with_a_200() {
     let player = &players[0];
 
     assert_eq!(player["name"], "Martha Wells");
-    assert_eq!(player["mode"], "unassigned");
+    assert_eq!(player["team"], "unassigned");
 
     assert!(player["id"].is_string());
     assert!(player["pdn_code"].is_string());

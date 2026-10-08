@@ -9,13 +9,13 @@ pub struct Player {
     pub name: PlayerName,
     pub email: Option<PlayerEmail>,
     pub created_at: DateTime<Utc>,
-    pub mode: PlayerMode,
+    pub team: PlayerTeam,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, utoipa::ToSchema)]
-#[sqlx(type_name = "player_mode", rename_all = "lowercase")]
+#[sqlx(type_name = "player_team", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
-pub enum PlayerMode {
+pub enum PlayerTeam {
     Unassigned,
     Hunter,
     Bounty,

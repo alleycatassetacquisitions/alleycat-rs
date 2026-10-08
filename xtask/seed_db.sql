@@ -12,7 +12,7 @@ WHERE id = 1 AND active_event_id IS NULL;
 SELECT id FROM events WHERE id = '20000000-0000-4000-8000-000000000001' FOR UPDATE;
 
 -- Stable IDs make the development fixtures safe to update and run repeatedly.
-INSERT INTO players (event_id, id, pdn_code, name, mode, email, created_at)
+INSERT INTO players (event_id, id, pdn_code, name, team, email, created_at)
 VALUES
     (
         '20000000-0000-4000-8000-000000000001',
@@ -63,7 +63,7 @@ ON CONFLICT (id) DO UPDATE SET
     event_id = EXCLUDED.event_id,
     pdn_code = EXCLUDED.pdn_code,
     name = EXCLUDED.name,
-    mode = EXCLUDED.mode,
+    team = EXCLUDED.team,
     email = EXCLUDED.email,
     created_at = EXCLUDED.created_at;
 

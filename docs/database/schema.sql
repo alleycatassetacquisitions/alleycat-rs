@@ -17,17 +17,6 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: player_mode; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.player_mode AS ENUM (
-    'unassigned',
-    'hunter',
-    'bounty'
-);
-
-
---
 -- Name: player_role; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -35,6 +24,17 @@ CREATE TYPE public.player_role AS ENUM (
     'staff',
     'courier',
     'miniboss'
+);
+
+
+--
+-- Name: player_team; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.player_team AS ENUM (
+    'unassigned',
+    'hunter',
+    'bounty'
 );
 
 
@@ -108,7 +108,7 @@ CREATE TABLE public.players (
     id uuid NOT NULL,
     pdn_code text NOT NULL,
     name text NOT NULL,
-    mode public.player_mode DEFAULT 'unassigned'::public.player_mode NOT NULL,
+    team public.player_team DEFAULT 'unassigned'::public.player_team NOT NULL,
     email text,
     created_at timestamp with time zone NOT NULL,
     event_id uuid NOT NULL,

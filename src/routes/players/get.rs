@@ -1,4 +1,4 @@
-use crate::domain::PlayerMode;
+use crate::domain::PlayerTeam;
 use crate::events::get_active_event_id;
 use actix_web::get;
 use actix_web::{error::ErrorInternalServerError, web};
@@ -19,7 +19,7 @@ struct PlayerResponse {
     pdn_code: String,
     name: String,
     created_at: DateTime<Utc>,
-    mode: PlayerMode,
+    team: PlayerTeam,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -90,7 +90,7 @@ async fn fetch_players(
         r#"
         SELECT
             id, pdn_code, name, created_at,
-            mode AS "mode: PlayerMode"
+            team AS "team: PlayerTeam"
         FROM players
         WHERE event_id = $3
         ORDER BY created_at DESC, id DESC

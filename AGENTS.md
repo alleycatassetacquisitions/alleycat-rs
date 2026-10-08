@@ -17,6 +17,17 @@
 
 ## Database migrations
 
+- Until the release version, treat migrations as applying to a fresh database.
+  Schema changes do not need to preserve existing development data or include
+  data backfills or data-preserving transition migrations.
+  Always add new migrations for schema changes; do not modify existing migrations.
+  This keeps unapplied-migration detection in the xtask stack startup workflow
+  reliable. Squashing migrations is a separate, explicitly requested maintenance
+  task, not part of routine schema changes.
+  The complete migration set must still apply successfully to an empty database.
+- Before release, revisit this policy. From release onward, schema changes must
+  use forward migrations that preserve existing data unless explicitly agreed
+  otherwise.
 - Whenever a migration is added or changed, run `cargo xtask docs db` with
   Docker running and include any regenerated changes to
   `docs/database/README.md` and `docs/database/schema.sql` in the same change.

@@ -25,8 +25,8 @@ flowchart LR
 
 | Type | Values |
 | --- | --- |
-| public.player_mode | unassigned, hunter, bounty |
 | public.player_role | staff, courier, miniboss |
+| public.player_team | unassigned, hunter, bounty |
 
 ## public.app_state
 
@@ -156,7 +156,7 @@ flowchart LR
 | id | uuid | no |  |  |
 | pdn_code | text | no |  |  |
 | name | text | no |  |  |
-| mode | player_mode | no | 'unassigned'::player_mode |  |
+| team | player_team | no | 'unassigned'::player_team |  |
 | email | text | yes |  |  |
 | created_at | timestamp with time zone | no |  |  |
 | event_id | uuid | no |  |  |
@@ -171,11 +171,11 @@ flowchart LR
 | players_event_name_key | UNIQUE (event_id, name) |
 | players_event_pdn_code_key | UNIQUE (event_id, pdn_code) |
 | players_id_not_null | NOT NULL id |
-| players_mode_not_null | NOT NULL mode |
 | players_name_not_null | NOT NULL name |
 | players_pdn_code_check | CHECK ((pdn_code ~ '^[0-9]{4}$'::text)) |
 | players_pdn_code_not_null | NOT NULL pdn_code |
 | players_pkey | PRIMARY KEY (id) |
+| players_team_not_null | NOT NULL team |
 
 ### Indexes
 
