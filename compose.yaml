@@ -24,7 +24,7 @@ services:
   migrate:
     build:
       context: .
-      target: migration
+      dockerfile: Dockerfile.migrations
     restart: "no"
     depends_on:
       postgres:

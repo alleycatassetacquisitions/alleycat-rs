@@ -131,6 +131,37 @@ updates without pending migrations only need `cargo xtask stack start`.
 `scripts/delete_local_instance.sh` asks for confirmation, backs up logs and the
 database, and then deletes the local containers and database volume.
 
+## Remote deployment and database
+
+Set `REMOTE_DB_URL` (the DigitalOcean PostgreSQL connection URL, including its
+SSL options) and `REMOTE_DEPLOY_URL` (the deployed API base URL) in `.env`.
+Shell variables override `.env`; cloud commands never use the local
+`DATABASE_URL` or `POSTGRES_*` settings.
+
+```bash
+cargo xtask cloud status      # Check the deployed API's health (requires curl).
+cargo xtask cloud db info     # Show installed and pending migrations.
+cargo xtask cloud db migrate  # Apply pending migrations without resetting data.
+```
+
+Remote database commands require Docker. They build `Dockerfile.migrations`
+using cached layers, then run its tools against `REMOTE_DB_URL`. The same
+Dockerfile serves local Compose migrations; the application Dockerfile no
+longer includes the migration tools. Connection credentials are passed at
+runtime, not baked into the image.
+
+For disposable remote databases only:
+
+```bash
+cargo xtask cloud db seed   # Insert or update sample data.
+cargo xtask cloud db reset  # Delete application data and reapply migrations.
+```
+
+Both commands require typing the database name to confirm. For automation,
+set `CONFIRM_REMOTE_DB_SEED` or `CONFIRM_REMOTE_DB_RESET` in the shell to the
+exact database name. Reset does not back up or seed data. Never use reset
+for routine deployment or verification.
+
 ## Native development
 
 API database connections limit each lock wait to 3 seconds and each SQL statement

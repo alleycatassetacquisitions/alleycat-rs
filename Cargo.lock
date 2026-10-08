@@ -4443,6 +4443,7 @@ dependencies = [
  "clap",
  "dotenvy",
  "serde_json",
+ "url",
 ]
 
 [[package]]

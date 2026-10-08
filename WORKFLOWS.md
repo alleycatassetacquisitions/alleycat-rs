@@ -25,8 +25,11 @@ Click a command to edit its Rust file; click its script to see the behavior to p
 | [native db reset](xtask/src/native/db/reset.rs) | TBD | [reset_db.sh](scripts/reset_db.sh) |
 | [native db delete](xtask/src/native/db/delete.rs) | TBD | [kill_db.sh](scripts/kill_db.sh) |
 | [native db clean-tests](xtask/src/native/db/clean_tests.rs) | TBD | [clean_test_dbs.sh](scripts/clean_test_dbs.sh) |
-| [cloud db seed](xtask/src/cloud/db/seed.rs) | TBD | [seed_db.sh](scripts/seed_db.sh), URL branch |
-| [cloud db reset](xtask/src/cloud/db/reset.rs) | TBD | [reset_remote_db.sh](scripts/reset_remote_db.sh), including migrations |
+| [cloud status](xtask/src/cloud/mod.rs) | Ready | Checks the deployment health using `REMOTE_DEPLOY_URL`. |
+| [cloud db info](xtask/src/cloud/db/mod.rs) | Ready | Shows remote migration status using `REMOTE_DB_URL`. |
+| [cloud db migrate](xtask/src/cloud/db/mod.rs) | Ready | Applies pending remote migrations without resetting data. |
+| [cloud db seed](xtask/src/cloud/db/mod.rs) | Ready | Confirms and seeds the remote database using `REMOTE_DB_URL`. |
+| [cloud db reset](xtask/src/cloud/db/mod.rs) | Ready | Confirms deletion, executes [the reset inventory](xtask/reset_remote_db.sql), then reapplies migrations. |
 | [sqlx prepare](xtask/src/sqlx/prepare.rs) | TBD | [prepare_sqlx.sh](scripts/prepare_sqlx.sh) |
 
 Menu files: [root](xtask/src/main.rs), [stack](xtask/src/stack/mod.rs),

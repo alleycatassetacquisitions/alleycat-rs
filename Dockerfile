@@ -14,13 +14,6 @@ COPY . .
 ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
-FROM chef AS migration
-RUN cargo install --version='~0.8' sqlx-cli \
-    --no-default-features \
-    --features rustls,postgres
-COPY migrations migrations
-ENTRYPOINT ["sqlx", "migrate", "run"]
-
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
