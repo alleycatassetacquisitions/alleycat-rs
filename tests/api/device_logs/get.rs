@@ -20,11 +20,7 @@ async fn get_device_logs_returns_json_with_saved_reports() {
     let write_response = app.post_protobuf("/device-logs", &report).await;
     assert_eq!(204, write_response.status().as_u16());
 
-    let response = reqwest::Client::new()
-        .get(format!("{}/device-logs", app.address))
-        .send()
-        .await
-        .expect("Failed to execute device-log read request.");
+    let response = app.get("/device-logs").await;
 
     assert_eq!(200, response.status().as_u16());
     assert_eq!(

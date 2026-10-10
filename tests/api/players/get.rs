@@ -1,10 +1,10 @@
-use crate::helpers::spawn_app_with_event as spawn_app;
+use crate::helpers::{spawn_app, spawn_app_with_event};
 use reqwest::header::CONTENT_TYPE;
 use serde_json::Value;
 
 #[tokio::test]
 async fn player_is_retrieved_with_a_200() {
-    let app = spawn_app().await;
+    let app = spawn_app_with_event().await;
     let body = "name=Martha%20Wells&email=martha%40example.com";
     let post_response = app.post_players(body.into()).await;
     assert_eq!(200, post_response.status().as_u16());
@@ -43,9 +43,9 @@ async fn player_is_retrieved_with_a_200() {
 
 #[tokio::test]
 async fn listing_is_scoped_to_active_event_and_names_and_codes_can_be_reused() {
-    let app = spawn_app().await;
+    let app = spawn_app_with_event().await;
     assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
-    let event_id = crate::helpers::activate_new_event(&app).await;
+    let event_id = app.activate_new_event().await;
     let empty: Value = app.get_players().await.json().await.unwrap();
     assert_eq!(empty["players"].as_array().unwrap().len(), 0);
     assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
@@ -68,7 +68,7 @@ async fn listing_is_scoped_to_active_event_and_names_and_codes_can_be_reused() {
 
 #[tokio::test]
 async fn development_seed_is_repeatable_and_registration_works_afterward() {
-    let app = crate::helpers::spawn_app().await;
+    let app = spawn_app().await;
     for _ in 0..2 {
         sqlx::raw_sql(include_str!("../../../xtask/seed_db.sql"))
             .execute(&app.db_pool)
@@ -81,7 +81,7 @@ async fn development_seed_is_repeatable_and_registration_works_afterward() {
         .await
         .unwrap();
     assert_eq!(code, "0506");
-    let other_event = crate::helpers::activate_new_event(&app).await;
+    let other_event = app.activate_new_event().await;
     sqlx::raw_sql(include_str!("../../../xtask/seed_db.sql"))
         .execute(&app.db_pool)
         .await
@@ -96,7 +96,7 @@ async fn development_seed_is_repeatable_and_registration_works_afterward() {
 
 #[tokio::test]
 async fn development_seed_preserves_membership_after_team_rename() {
-    let app = crate::helpers::spawn_app().await;
+    let app = spawn_app().await;
     let seed = include_str!("../../../xtask/seed_db.sql");
     sqlx::raw_sql(seed).execute(&app.db_pool).await.unwrap();
 
