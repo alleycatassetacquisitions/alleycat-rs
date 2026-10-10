@@ -16,9 +16,12 @@ flowchart LR
     t3["public.player_roles"]
     t4["public.players"]
     t5["public.reserved_pdn_codes"]
+    t6["public.teams"]
     t0 -->|"FOREIGN KEY (active_event_id) REFERENCES events(id)"| t2
     t3 -->|"FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE"| t4
     t4 -->|"FOREIGN KEY (event_id) REFERENCES events(id)"| t2
+    t4 -->|"FOREIGN KEY (event_id, team_id) REFERENCES teams(event_id, id)"| t6
+    t6 -->|"FOREIGN KEY (event_id) REFERENCES events(id)"| t2
 ```
 
 ## Enum types
@@ -26,7 +29,6 @@ flowchart LR
 | Type | Values |
 | --- | --- |
 | public.player_role | staff, courier, miniboss |
-| public.player_team | unassigned, hunter, bounty |
 
 ## public.app_state
 
@@ -156,10 +158,10 @@ flowchart LR
 | id | uuid | no |  |  |
 | pdn_code | text | no |  |  |
 | name | text | no |  |  |
-| team | player_team | no | 'unassigned'::player_team |  |
 | email | text | yes |  |  |
 | created_at | timestamp with time zone | no |  |  |
 | event_id | uuid | no |  |  |
+| team_id | uuid | yes |  |  |
 
 ### Constraints
 
@@ -170,12 +172,12 @@ flowchart LR
 | players_event_id_not_null | NOT NULL event_id |
 | players_event_name_key | UNIQUE (event_id, name) |
 | players_event_pdn_code_key | UNIQUE (event_id, pdn_code) |
+| players_event_team_fkey | FOREIGN KEY (event_id, team_id) REFERENCES teams(event_id, id) |
 | players_id_not_null | NOT NULL id |
 | players_name_not_null | NOT NULL name |
 | players_pdn_code_check | CHECK ((pdn_code ~ '^[0-9]{4}$'::text)) |
 | players_pdn_code_not_null | NOT NULL pdn_code |
 | players_pkey | PRIMARY KEY (id) |
-| players_team_not_null | NOT NULL team |
 
 ### Indexes
 
@@ -208,3 +210,34 @@ flowchart LR
 | Definition |
 | --- |
 | CREATE UNIQUE INDEX reserved_pdn_codes_pkey ON public.reserved_pdn_codes USING btree (code) |
+
+## public.teams
+
+
+
+| Column | Type | Nullable | Default | Description |
+| --- | --- | --- | --- | --- |
+| id | uuid | no | gen_random_uuid() |  |
+| event_id | uuid | no |  |  |
+| name | text | no |  |  |
+
+### Constraints
+
+| Name | Definition |
+| --- | --- |
+| teams_event_id_fkey | FOREIGN KEY (event_id) REFERENCES events(id) |
+| teams_event_id_key | UNIQUE (event_id, id) |
+| teams_event_id_not_null | NOT NULL event_id |
+| teams_event_name_key | UNIQUE (event_id, name) |
+| teams_id_not_null | NOT NULL id |
+| teams_name_check | CHECK (((name &lt;&gt; ''::text) AND (name = btrim(name)))) |
+| teams_name_not_null | NOT NULL name |
+| teams_pkey | PRIMARY KEY (id) |
+
+### Indexes
+
+| Definition |
+| --- |
+| CREATE UNIQUE INDEX teams_event_id_key ON public.teams USING btree (event_id, id) |
+| CREATE UNIQUE INDEX teams_event_name_key ON public.teams USING btree (event_id, name) |
+| CREATE UNIQUE INDEX teams_pkey ON public.teams USING btree (id) |

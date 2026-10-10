@@ -33,7 +33,8 @@ async fn player_is_retrieved_with_a_200() {
     let player = &players[0];
 
     assert_eq!(player["name"], "Martha Wells");
-    assert_eq!(player["team"], "unassigned");
+    assert_eq!(player.get("team_id"), Some(&Value::Null));
+    assert!(player.get("team").is_none());
 
     assert!(player["id"].is_string());
     assert!(player["pdn_code"].is_string());
@@ -91,4 +92,69 @@ async fn development_seed_is_repeatable_and_registration_works_afterward() {
             .await
             .unwrap();
     assert_eq!(active, Some(other_event));
+}
+
+#[tokio::test]
+async fn development_seed_preserves_membership_after_team_rename() {
+    let app = crate::helpers::spawn_app().await;
+    let seed = include_str!("../../../xtask/seed_db.sql");
+    sqlx::raw_sql(seed).execute(&app.db_pool).await.unwrap();
+
+    let original_teams: Vec<(uuid::Uuid, String)> =
+        sqlx::query_as("SELECT id, name FROM teams ORDER BY name")
+            .fetch_all(&app.db_pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        original_teams
+            .iter()
+            .map(|(_, name)| name.as_str())
+            .collect::<Vec<_>>(),
+        ["Bounty", "Hunter"]
+    );
+    let memberships = "SELECT id, team_id FROM players ORDER BY id";
+    let original: Vec<(uuid::Uuid, Option<uuid::Uuid>)> = sqlx::query_as(memberships)
+        .fetch_all(&app.db_pool)
+        .await
+        .unwrap();
+    assert_eq!(original.len(), 5);
+    assert_eq!(
+        original.iter().filter(|(_, team)| team.is_some()).count(),
+        4
+    );
+
+    sqlx::query("UPDATE teams SET name = name || ' renamed'")
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+
+    // Neither missing seed names nor replacement teams may change membership.
+    for replacements in [false, true] {
+        if replacements {
+            sqlx::query(
+                "INSERT INTO teams (event_id, name)
+                 SELECT event_id, name FROM
+                 (SELECT DISTINCT event_id FROM players) events
+                 CROSS JOIN (VALUES ('Hunter'), ('Bounty')) names(name)",
+            )
+            .execute(&app.db_pool)
+            .await
+            .unwrap();
+        }
+        sqlx::raw_sql(seed).execute(&app.db_pool).await.unwrap();
+        let actual: Vec<(uuid::Uuid, Option<uuid::Uuid>)> = sqlx::query_as(memberships)
+            .fetch_all(&app.db_pool)
+            .await
+            .unwrap();
+        assert_eq!(actual, original);
+        let actual_teams: Vec<(uuid::Uuid, String)> =
+            sqlx::query_as("SELECT id, name FROM teams ORDER BY name")
+                .fetch_all(&app.db_pool)
+                .await
+                .unwrap();
+        assert_eq!(actual_teams.len(), if replacements { 4 } else { 2 });
+        for (id, name) in &original_teams {
+            assert!(actual_teams.contains(&(*id, format!("{name} renamed"))));
+        }
+    }
 }

@@ -27,17 +27,6 @@ CREATE TYPE public.player_role AS ENUM (
 );
 
 
---
--- Name: player_team; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.player_team AS ENUM (
-    'unassigned',
-    'hunter',
-    'bounty'
-);
-
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -108,10 +97,10 @@ CREATE TABLE public.players (
     id uuid NOT NULL,
     pdn_code text NOT NULL,
     name text NOT NULL,
-    team public.player_team DEFAULT 'unassigned'::public.player_team NOT NULL,
     email text,
     created_at timestamp with time zone NOT NULL,
     event_id uuid NOT NULL,
+    team_id uuid,
     CONSTRAINT players_pdn_code_check CHECK ((pdn_code ~ '^[0-9]{4}$'::text))
 );
 
@@ -124,6 +113,18 @@ CREATE TABLE public.reserved_pdn_codes (
     code text NOT NULL,
     reason text,
     CONSTRAINT reserved_pdn_codes_code_check CHECK ((code ~ '^[0-9]{4}$'::text))
+);
+
+
+--
+-- Name: teams; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.teams (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    event_id uuid NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT teams_name_check CHECK (((name <> ''::text) AND (name = btrim(name))))
 );
 
 
@@ -200,6 +201,30 @@ ALTER TABLE ONLY public.reserved_pdn_codes
 
 
 --
+-- Name: teams teams_event_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_event_id_key UNIQUE (event_id, id);
+
+
+--
+-- Name: teams teams_event_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_event_name_key UNIQUE (event_id, name);
+
+
+--
+-- Name: teams teams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: players_event_created_at_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -228,6 +253,22 @@ ALTER TABLE ONLY public.player_roles
 
 ALTER TABLE ONLY public.players
     ADD CONSTRAINT players_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id);
+
+
+--
+-- Name: players players_event_team_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.players
+    ADD CONSTRAINT players_event_team_fkey FOREIGN KEY (event_id, team_id) REFERENCES public.teams(event_id, id);
+
+
+--
+-- Name: teams teams_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.teams
+    ADD CONSTRAINT teams_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id);
 
 
 --
