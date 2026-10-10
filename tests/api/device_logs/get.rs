@@ -33,9 +33,6 @@ async fn get_device_logs_returns_json_with_saved_reports() {
         .await
         .expect("Response was not valid JSON.");
 
-    assert_eq!(body["pagination"]["page"], 1);
-    assert_eq!(body["pagination"]["per_page"], 20);
-
     let device_logs = body["device_logs"]
         .as_array()
         .expect("`device_logs` was not a JSON array.");

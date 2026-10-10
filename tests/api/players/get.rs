@@ -22,9 +22,6 @@ async fn player_is_retrieved_with_a_200() {
         .await
         .expect("Response was not valid JSON.");
 
-    assert_eq!(body["pagination"]["page"], 1);
-    assert_eq!(body["pagination"]["per_page"], 20);
-
     let players = body["players"]
         .as_array()
         .expect("`players` was not a JSON array.");

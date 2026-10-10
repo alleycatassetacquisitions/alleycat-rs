@@ -3,6 +3,7 @@ mod documentation;
 mod events;
 #[path = "health_check.rs"]
 mod health;
+mod pagination;
 mod players;
 mod teams;
 mod version;
