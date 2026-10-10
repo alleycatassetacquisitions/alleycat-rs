@@ -11,15 +11,25 @@ WHERE id = 1 AND active_event_id IS NULL;
 -- Coordinate with registration before changing this event's players/counter.
 SELECT id FROM events WHERE id = '20000000-0000-4000-8000-000000000001' FOR UPDATE;
 
+-- Team identity is independent of its editable name. Reseeding must not rename
+-- teams or recreate the default names after a rename.
+INSERT INTO teams (id, event_id, name)
+VALUES
+    ('30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'Hunter'),
+    ('30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'Bounty')
+ON CONFLICT (id) DO NOTHING;
+
 -- Stable IDs make the development fixtures safe to update and run repeatedly.
-INSERT INTO players (event_id, id, pdn_code, name, team, email, created_at)
+-- Stable team IDs also assign new fixtures correctly after team renames.
+-- Reseeding preserves existing membership.
+INSERT INTO players (event_id, id, pdn_code, name, team_id, email, created_at)
 VALUES
     (
         '20000000-0000-4000-8000-000000000001',
         '10000000-0000-4000-8000-000000000001',
         '0101',
         'Nyx Voltage',
-        'hunter',
+        '30000000-0000-4000-8000-000000000001',
         'avery@example.test',
         now() - interval '45 days'
     ),
@@ -28,7 +38,7 @@ VALUES
         '10000000-0000-4000-8000-000000000002',
         '0202',
         'Rook Zero',
-        'bounty',
+        '30000000-0000-4000-8000-000000000002',
         'jordan@example.test',
         now() - interval '20 days'
     ),
@@ -37,7 +47,7 @@ VALUES
         '10000000-0000-4000-8000-000000000003',
         '0303',
         'Echo Vane',
-        'unassigned',
+        NULL,
         NULL,
         now() - interval '7 days'
     ),
@@ -46,7 +56,7 @@ VALUES
         '10000000-0000-4000-8000-000000000004',
         '0404',
         'Chrome Wraith',
-        'hunter',
+        '30000000-0000-4000-8000-000000000001',
         'sam@example.test',
         now() - interval '2 days'
     ),
@@ -55,7 +65,7 @@ VALUES
         '10000000-0000-4000-8000-000000000005',
         '0505',
         'Nova Static',
-        'bounty',
+        '30000000-0000-4000-8000-000000000002',
         'taylor@example.test',
         now() - interval '4 hours'
     )
@@ -63,7 +73,6 @@ ON CONFLICT (id) DO UPDATE SET
     event_id = EXCLUDED.event_id,
     pdn_code = EXCLUDED.pdn_code,
     name = EXCLUDED.name,
-    team = EXCLUDED.team,
     email = EXCLUDED.email,
     created_at = EXCLUDED.created_at;
 

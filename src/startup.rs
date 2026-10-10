@@ -1,7 +1,8 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::routes::{
-    VersionInfo, configure_documentation, create_event, get_device_logs, get_players, get_version,
-    health_check, register_player, set_active_event, update_event, write_device_log,
+    VersionInfo, configure_documentation, create_event, create_team, get_device_logs, get_players,
+    get_version, health_check, list_teams, register_player, rename_team, set_active_event,
+    update_event, write_device_log,
 };
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
@@ -49,6 +50,9 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
             .service(create_event)
             .service(update_event)
             .service(set_active_event)
+            .service(create_team)
+            .service(rename_team)
+            .service(list_teams)
             .split_for_parts();
         app.configure(|config| configure_documentation(config, api))
             .app_data(db_pool.clone())

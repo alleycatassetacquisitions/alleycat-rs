@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS
     device_logs,
     player_roles,
     players,
+    teams,
     app_state,
     events,
     reserved_pdn_codes,

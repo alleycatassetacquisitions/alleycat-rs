@@ -55,9 +55,22 @@ scripts/seed_db.sh
 ```
 
 The seed creates a development event and selects it only if no event is active.
+It adds Hunter and Bounty teams with stable UUIDs; reseeding preserves their
+names and existing player memberships.
+
 Players are registered and listed within the active event. A fresh, unseeded
 database has no active event: player registration returns `409 Conflict` and
-player listing is empty. Event management endpoints are not implemented yet.
+player listing is empty. Create events with `POST /events` and select one with
+`PUT /events/{id}/active`. New events have no teams.
+List or create teams with `GET` or `POST /events/{event_id}/teams`; rename one
+with `PATCH /events/{event_id}/teams/{id}`. Creation and renaming accept JSON
+`{"name": "Runners"}`. After trimming, names must contain 1–256 Unicode scalar
+values and no null characters. Names are case-sensitive unique within each
+event (duplicates return 409).
+Team routes use the explicit event, not the active selection. Renaming preserves
+the team's UUID and memberships. Registration leaves `team_id` null, which is
+also how unassigned players appear in listings.
+These routes do not provide deletion or membership changes.
 Registration also returns `409 Conflict` for a duplicate name within the active
 event or exhausted PDN codes. Codes are allocated sequentially, skipping reserved
 and already assigned values.
