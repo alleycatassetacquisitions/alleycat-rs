@@ -12,17 +12,6 @@ use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
 use utoipa_actix_web::AppExt;
 
-pub async fn build(configuration: Settings) -> Result<Server, std::io::Error> {
-    let connection_pool = get_connection_pool(&configuration.database);
-
-    let address = format!(
-        "{}:{}",
-        configuration.application.host, configuration.application.port
-    );
-    let listener = TcpListener::bind(address)?;
-    run(listener, connection_pool)
-}
-
 pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
     // Apply these defaults to every API connection, including replacements.
     // Migration and maintenance connections use the base options separately.
