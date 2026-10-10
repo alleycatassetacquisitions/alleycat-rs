@@ -2,7 +2,9 @@ use alleycat_rs::configuration::{DatabaseSettings, get_configuration};
 use alleycat_rs::startup::{Application, get_connection_pool};
 use alleycat_rs::telemetry::{get_subscriber, init_subscriber};
 use prost::Message;
+use reqwest::{Client, Method, RequestBuilder, Response};
 use secrecy::Secret;
+use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
 use uuid::Uuid;
@@ -20,30 +22,74 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
 });
 
 pub struct TestApp {
-    pub address: String,
+    address: String,
+    client: Client,
     pub db_pool: PgPool,
 }
 
 impl TestApp {
-    pub async fn post_players(&self, body: String) -> reqwest::Response {
-        reqwest::Client::new()
-            .post(&format!("{}/players", &self.address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(body)
-            .send()
-            .await
-            .expect("Faiiled to execute request.")
+    pub fn request(&self, method: Method, path: &str) -> RequestBuilder {
+        self.client.request(
+            method,
+            format!("{}/{}", self.address, path.trim_start_matches('/')),
+        )
     }
 
-    pub async fn get_players(&self) -> reqwest::Response {
-        reqwest::Client::new()
-            .get(&format!("{}/players", &self.address))
+    pub async fn request_json(&self, method: Method, path: &str, body: Value) -> Response {
+        self.request(method, path)
+            .json(&body)
             .send()
             .await
-            .expect("Faiiled to execute request.")
+            .expect("Failed to execute JSON request.")
     }
 
-    pub async fn post_protobuf<M>(&self, path: &str, message: &M) -> reqwest::Response
+    pub async fn get(&self, path: &str) -> Response {
+        self.request(Method::GET, path)
+            .send()
+            .await
+            .expect("Failed to execute GET request.")
+    }
+
+    pub async fn post_players(&self, body: String) -> Response {
+        self.post_bytes(
+            "/players",
+            "application/x-www-form-urlencoded",
+            body.into_bytes(),
+        )
+        .await
+    }
+
+    pub async fn get_players(&self) -> Response {
+        self.get("/players").await
+    }
+
+    // Create an event through the API without changing the active selection.
+    pub async fn create_event(&self, body: Value) -> Value {
+        let response = self.request_json(Method::POST, "/events", body).await;
+        assert_eq!(response.status(), 201, "Failed to create fixture event.");
+        response
+            .json()
+            .await
+            .expect("Event response was not valid JSON.")
+    }
+
+    // Seed an active event directly for tests that need one as a prerequisite.
+    pub async fn activate_new_event(&self) -> Uuid {
+        let id = Uuid::new_v4();
+        sqlx::query("INSERT INTO events (id, name, created_at) VALUES ($1, 'Test event', now())")
+            .bind(id)
+            .execute(&self.db_pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE app_state SET active_event_id = $1 WHERE id = 1")
+            .bind(id)
+            .execute(&self.db_pool)
+            .await
+            .unwrap();
+        id
+    }
+
+    pub async fn post_protobuf<M>(&self, path: &str, message: &M) -> Response
     where
         M: Message,
     {
@@ -51,14 +97,8 @@ impl TestApp {
             .await
     }
 
-    pub async fn post_bytes(
-        &self,
-        path: &str,
-        content_type: &str,
-        body: Vec<u8>,
-    ) -> reqwest::Response {
-        reqwest::Client::new()
-            .post(format!("{}/{}", self.address, path.trim_start_matches('/')))
+    pub async fn post_bytes(&self, path: &str, content_type: &str, body: Vec<u8>) -> Response {
+        self.request(Method::POST, path)
             .header("Content-Type", content_type)
             .body(body)
             .send()
@@ -67,6 +107,7 @@ impl TestApp {
     }
 }
 
+// A freshly migrated database has no events or active selection.
 pub async fn spawn_app() -> TestApp {
     LazyLock::force(&TRACING);
 
@@ -86,7 +127,8 @@ pub async fn spawn_app() -> TestApp {
     let _ = tokio::spawn(application.run_until_stopped());
 
     TestApp {
-        address: address,
+        address,
+        client: Client::new(),
         db_pool: get_connection_pool(&configuration.database),
     }
 }
@@ -122,24 +164,9 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
     connection_pool
 }
 
-// Player tests opt in to an event; a freshly migrated database has none.
+// Tests that require an active event opt in explicitly.
 pub async fn spawn_app_with_event() -> TestApp {
     let app = spawn_app().await;
-    activate_new_event(&app).await;
+    app.activate_new_event().await;
     app
-}
-
-pub async fn activate_new_event(app: &TestApp) -> Uuid {
-    let id = Uuid::new_v4();
-    sqlx::query("INSERT INTO events (id, name, created_at) VALUES ($1, 'Test event', now())")
-        .bind(id)
-        .execute(&app.db_pool)
-        .await
-        .unwrap();
-    sqlx::query("UPDATE app_state SET active_event_id = $1 WHERE id = 1")
-        .bind(id)
-        .execute(&app.db_pool)
-        .await
-        .unwrap();
-    id
 }

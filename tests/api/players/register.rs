@@ -1,8 +1,8 @@
-use crate::helpers::spawn_app_with_event as spawn_app;
+use crate::helpers::{spawn_app, spawn_app_with_event};
 
 #[tokio::test]
 async fn register_player_returns_a_200_for_valid_form_data() {
-    let app = spawn_app().await;
+    let app = spawn_app_with_event().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = app.post_players(body.into()).await;
 
@@ -20,7 +20,7 @@ async fn register_player_returns_a_200_for_valid_form_data() {
 
 #[tokio::test]
 async fn register_player_accepts_a_missing_email() {
-    let app = spawn_app().await;
+    let app = spawn_app_with_event().await;
     let body = "name=Ursula";
     let response = app.post_players(body.into()).await;
 
@@ -37,7 +37,7 @@ async fn register_player_accepts_a_missing_email() {
 
 #[tokio::test]
 async fn register_player_returns_a_400_when_fields_are_present_but_invalid() {
-    let app = spawn_app().await;
+    let app = spawn_app_with_event().await;
     let test_cases = vec![
         ("name=&email=ursula_le_guin%40gamil.com", "empty name"),
         ("name=Ursula&email=definitely-not-an-email", "invalid email"),
@@ -55,7 +55,7 @@ async fn register_player_returns_a_400_when_fields_are_present_but_invalid() {
 
 #[tokio::test]
 async fn register_player_returns_a_400_when_data_is_missing() {
-    let app = spawn_app().await;
+    let app = spawn_app_with_event().await;
     let test_cases = vec![("", "missing the name"), ("score=100", "invalid parameter")];
 
     for (invalid_body, error_message) in test_cases {
@@ -71,7 +71,7 @@ async fn register_player_returns_a_400_when_data_is_missing() {
 
 #[tokio::test]
 async fn registration_requires_an_active_event() {
-    let app = crate::helpers::spawn_app().await;
+    let app = spawn_app().await;
     assert_eq!(app.post_players("name=Nyx".into()).await.status(), 409);
     let count: i64 = sqlx::query_scalar("SELECT count(*) FROM players")
         .fetch_one(&app.db_pool)
@@ -82,7 +82,7 @@ async fn registration_requires_an_active_event() {
 
 #[tokio::test]
 async fn allocation_skips_reserved_and_used_codes_and_rolls_back_on_duplicate_name() {
-    let app = spawn_app().await;
+    let app = spawn_app_with_event().await;
     sqlx::query("INSERT INTO reserved_pdn_codes (code) VALUES ('0002')")
         .execute(&app.db_pool)
         .await
@@ -105,7 +105,7 @@ async fn allocation_skips_reserved_and_used_codes_and_rolls_back_on_duplicate_na
 
 #[tokio::test]
 async fn exhausted_event_returns_conflict_without_creating_a_player() {
-    let app = spawn_app().await;
+    let app = spawn_app_with_event().await;
     sqlx::query("UPDATE events SET next_pdn_code = 9998")
         .execute(&app.db_pool)
         .await
@@ -127,7 +127,7 @@ async fn exhausted_event_returns_conflict_without_creating_a_player() {
 
 #[tokio::test]
 async fn concurrent_registrations_allocate_distinct_sequential_codes() {
-    let app = spawn_app().await;
+    let app = spawn_app_with_event().await;
     let (first, second) = tokio::join!(
         app.post_players("name=Nyx".into()),
         app.post_players("name=Rook".into())
