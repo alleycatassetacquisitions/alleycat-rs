@@ -222,3 +222,18 @@ Run the test suite with:
 ```bash
 cargo test
 ```
+
+### SQL query checking
+
+Prefer SQLx macros for static application queries. Document runtime-query
+exceptions and the SQL guarantee behind any non-null override.
+
+To refresh query metadata, use SQLx CLI 0.8.6 and set `DATABASE_URL` to a
+disposable local database with all migrations applied:
+
+```bash
+SQLX_OFFLINE=false cargo sqlx prepare --workspace -- --all-targets
+```
+
+Include the `.sqlx/` changes in your commit. CI checks freshness and offline
+compilation. Avoid `scripts/prepare_sqlx.sh`: it resets the development database.

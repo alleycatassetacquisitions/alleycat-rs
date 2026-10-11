@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO device_logs (\n            device_mac,\n            crash_number,\n            uptime_ms,\n            software_version,\n            reset_reason,\n            program_counter,\n            exception_cause,\n            task_name\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n        ON CONFLICT (device_mac, crash_number) DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Macaddr",
+        "Int8",
+        "Int8",
+        "Text",
+        "Int4",
+        "Int8",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1997c7c7ad0f2d5ad438f58396635eb047efb244bb40bdb4209a805cec547bf8"
+}

@@ -104,7 +104,7 @@ pub async fn write_device_log(
 
 #[tracing::instrument(name = "Insert device log", skip(pool, device_log))]
 async fn insert_device_log(pool: &PgPool, device_log: &NewDeviceLog) -> Result<(), sqlx::Error> {
-    sqlx::query(
+    sqlx::query!(
         r#"
         INSERT INTO device_logs (
             device_mac,
@@ -119,15 +119,15 @@ async fn insert_device_log(pool: &PgPool, device_log: &NewDeviceLog) -> Result<(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (device_mac, crash_number) DO NOTHING
         "#,
+        device_log.device_mac,
+        device_log.crash_number,
+        device_log.uptime_ms,
+        device_log.software_version.as_deref(),
+        device_log.reset_reason,
+        device_log.program_counter,
+        device_log.exception_cause,
+        device_log.task_name.as_deref()
     )
-    .bind(device_log.device_mac)
-    .bind(device_log.crash_number)
-    .bind(device_log.uptime_ms)
-    .bind(device_log.software_version.as_deref())
-    .bind(device_log.reset_reason)
-    .bind(device_log.program_counter)
-    .bind(device_log.exception_cause)
-    .bind(device_log.task_name.as_deref())
     .execute(pool)
     .await?;
 

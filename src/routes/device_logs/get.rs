@@ -7,7 +7,7 @@ use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[derive(Serialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct DeviceLogResponse {
     id: Uuid,
     device_mac: String,
@@ -60,11 +60,14 @@ async fn fetch_device_logs(
 ) -> Result<Vec<DeviceLogResponse>, sqlx::Error> {
     let (limit, offset) = pagination.limit_offset();
 
-    sqlx::query_as::<_, DeviceLogResponse>(
+    // device_mac is NOT NULL; casting macaddr to text preserves that guarantee.
+    // PostgreSQL does not report the cast expression's nullability to SQLx.
+    sqlx::query_as!(
+        DeviceLogResponse,
         r#"
         SELECT
             id,
-            device_mac::text AS device_mac,
+            device_mac::text AS "device_mac!",
             crash_number,
             uptime_ms,
             received_at,
@@ -77,9 +80,9 @@ async fn fetch_device_logs(
         ORDER BY received_at DESC, id DESC
         LIMIT $1 OFFSET $2
         "#,
+        limit,
+        offset
     )
-    .bind(limit)
-    .bind(offset)
     .fetch_all(pool)
     .await
 }

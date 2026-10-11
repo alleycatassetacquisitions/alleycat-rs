@@ -32,7 +32,7 @@ where
     T::deserialize(deserializer).map(Some)
 }
 
-#[derive(Serialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct EventResponse {
     id: Uuid,
     name: String,
@@ -73,14 +73,15 @@ pub async fn create_event(
 ) -> actix_web::Result<HttpResponse> {
     validate_name(&body.name)?;
     validate_venue(body.venue_name.as_deref())?;
-    let event = sqlx::query_as::<_, EventResponse>(
+    let event = sqlx::query_as!(
+        EventResponse,
         "INSERT INTO events (id, name, venue_name, created_at) VALUES ($1, $2, $3, $4)
          RETURNING id, name, venue_name, created_at",
+        Uuid::new_v4(),
+        body.name.trim(),
+        body.venue_name.as_deref(),
+        Utc::now()
     )
-    .bind(Uuid::new_v4())
-    .bind(body.name.trim())
-    .bind(&body.venue_name)
-    .bind(Utc::now())
     .fetch_one(pool.get_ref())
     .await
     .map_err(|error| database_error(error, "Event operation failed"))?;
@@ -112,15 +113,16 @@ pub async fn update_event(
     validate_venue(body.venue_name.as_ref().and_then(|venue| venue.as_deref()))?;
     // Apply only supplied fields in one statement, avoiding lost updates when
     // separate requests edit the name and venue concurrently.
-    let event = sqlx::query_as::<_, EventResponse>(
+    let event = sqlx::query_as!(
+        EventResponse,
         "UPDATE events SET name = COALESCE($2, name),
          venue_name = CASE WHEN $3 THEN $4 ELSE venue_name END
          WHERE id = $1 RETURNING id, name, venue_name, created_at",
+        *id,
+        body.name.as_deref().map(str::trim),
+        body.venue_name.is_some(),
+        body.venue_name.as_ref().and_then(|venue| venue.as_deref())
     )
-    .bind(*id)
-    .bind(body.name.as_deref().map(str::trim))
-    .bind(body.venue_name.is_some())
-    .bind(body.venue_name.as_ref().and_then(|venue| venue.as_deref()))
     .fetch_optional(pool.get_ref())
     .await
     .map_err(|error| database_error(error, "Event operation failed"))?
@@ -143,12 +145,12 @@ pub async fn set_active_event(
 ) -> actix_web::Result<HttpResponse> {
     // Updating the singleton row waits for registrations holding FOR SHARE.
     // An unknown event leaves the previous selection intact.
-    let selected = sqlx::query_scalar::<_, Uuid>(
+    let selected = sqlx::query_scalar!(
         "UPDATE app_state SET active_event_id = $1
          WHERE id = 1 AND EXISTS (SELECT 1 FROM events WHERE id = $1)
          RETURNING active_event_id",
+        *id
     )
-    .bind(*id)
     .fetch_optional(pool.get_ref())
     .await
     .map_err(|error| database_error(error, "Event operation failed"))?;

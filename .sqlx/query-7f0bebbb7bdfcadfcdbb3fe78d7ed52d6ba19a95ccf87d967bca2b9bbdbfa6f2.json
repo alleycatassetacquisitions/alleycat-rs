@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE app_state SET active_event_id = $1\n         WHERE id = 1 AND EXISTS (SELECT 1 FROM events WHERE id = $1)\n         RETURNING active_event_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "active_event_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "7f0bebbb7bdfcadfcdbb3fe78d7ed52d6ba19a95ccf87d967bca2b9bbdbfa6f2"
+}

@@ -12,7 +12,7 @@ pub struct TeamName {
     name: String,
 }
 
-#[derive(Serialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct TeamResponse {
     id: Uuid,
     event_id: Uuid,
@@ -57,13 +57,14 @@ pub async fn create_team(
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
     validate_name(&body.name)?;
-    let team = sqlx::query_as::<_, TeamResponse>(
+    let team = sqlx::query_as!(
+        TeamResponse,
         "INSERT INTO teams (event_id, name)
          SELECT id, $2 FROM events WHERE id = $1
          RETURNING id, event_id, name",
+        *event_id,
+        body.name.trim()
     )
-    .bind(*event_id)
-    .bind(body.name.trim())
     .fetch_optional(pool.get_ref())
     .await
     .map_err(database_error)?
@@ -95,13 +96,14 @@ pub async fn rename_team(
 ) -> actix_web::Result<HttpResponse> {
     validate_name(&body.name)?;
     let (event_id, id) = path.into_inner();
-    let team = sqlx::query_as::<_, TeamResponse>(
+    let team = sqlx::query_as!(
+        TeamResponse,
         "UPDATE teams SET name = $3 WHERE event_id = $1 AND id = $2
          RETURNING id, event_id, name",
+        event_id,
+        id,
+        body.name.trim()
     )
-    .bind(event_id)
-    .bind(id)
-    .bind(body.name.trim())
     .fetch_optional(pool.get_ref())
     .await
     .map_err(database_error)?
@@ -124,18 +126,22 @@ pub async fn list_teams(
     event_id: web::Path<Uuid>,
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM events WHERE id = $1)")
-        .bind(*event_id)
-        .fetch_one(pool.get_ref())
-        .await
-        .map_err(database_error)?;
+    // EXISTS always returns a non-null boolean, even when no event matches.
+    let exists = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM events WHERE id = $1) AS "exists!""#,
+        *event_id
+    )
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(database_error)?;
     if !exists {
         return Err(error::ErrorNotFound("Event not found"));
     }
-    let teams = sqlx::query_as::<_, TeamResponse>(
+    let teams = sqlx::query_as!(
+        TeamResponse,
         "SELECT id, event_id, name FROM teams WHERE event_id = $1 ORDER BY name, id",
+        *event_id
     )
-    .bind(*event_id)
     .fetch_all(pool.get_ref())
     .await
     .map_err(database_error)?;
