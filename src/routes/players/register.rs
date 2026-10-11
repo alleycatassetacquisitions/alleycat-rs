@@ -56,34 +56,38 @@ pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>)
         Err(RegistrationError::CodesExhausted) => {
             HttpResponse::Conflict().body("No PDN codes available for the active event")
         }
+        Err(RegistrationError::DuplicateName) => {
+            HttpResponse::Conflict().body("Player name already exists in the active event")
+        }
         Err(RegistrationError::Database(error)) => {
-            if error.as_database_error().and_then(|e| e.constraint())
-                == Some("players_event_name_key")
-            {
-                return HttpResponse::Conflict()
-                    .body("Player name already exists in the active event");
-            }
             database_error(error, "Failed to register player").error_response()
         }
     }
 }
 
 #[derive(Debug)]
-pub enum RegistrationError {
+enum RegistrationError {
     NoActiveEvent,
     CodesExhausted,
+    DuplicateName,
     Database(sqlx::Error),
 }
 
 impl From<sqlx::Error> for RegistrationError {
     fn from(error: sqlx::Error) -> Self {
-        Self::Database(error)
+        if error.as_database_error().and_then(|e| e.constraint()) == Some("players_event_name_key")
+        {
+            Self::DuplicateName
+        } else {
+            Self::Database(error)
+        }
     }
 }
 
 #[tracing::instrument(name = "Adding a player to the database", skip(new_player, pool))]
-pub async fn insert_player(pool: &PgPool, new_player: &NewPlayer) -> Result<(), RegistrationError> {
+async fn insert_player(pool: &PgPool, new_player: &NewPlayer) -> Result<(), RegistrationError> {
     let mut transaction = pool.begin().await?;
+    // Keep the selection locked through allocation, persistence, and commit.
     let event_id = lock_active_event(&mut transaction)
         .await?
         .ok_or(RegistrationError::NoActiveEvent)?;

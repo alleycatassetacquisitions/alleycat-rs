@@ -1,9 +1,9 @@
 use crate::helpers::{spawn_app, spawn_app_with_event};
 
-async fn assert_registration_conflict(response: reqwest::Response) {
+async fn assert_registration_conflict(response: reqwest::Response, message: &str) {
     assert_eq!(response.status(), 409);
     assert!(response.headers().get("content-type").is_none());
-    assert!(!response.text().await.unwrap().trim().is_empty());
+    assert_eq!(response.text().await.unwrap(), message);
 }
 
 #[tokio::test]
@@ -78,7 +78,8 @@ async fn register_player_returns_a_400_when_data_is_missing() {
 #[tokio::test]
 async fn registration_requires_an_active_event() {
     let app = spawn_app().await;
-    assert_registration_conflict(app.post_players("name=Nyx".into()).await).await;
+    assert_registration_conflict(app.post_players("name=Nyx".into()).await, "No active event")
+        .await;
     let count: i64 = sqlx::query_scalar("SELECT count(*) FROM players")
         .fetch_one(&app.db_pool)
         .await
@@ -94,7 +95,11 @@ async fn allocation_skips_reserved_and_used_codes_and_rolls_back_on_duplicate_na
         .await
         .unwrap();
     assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
-    assert_registration_conflict(app.post_players("name=Nyx".into()).await).await;
+    assert_registration_conflict(
+        app.post_players("name=Nyx".into()).await,
+        "Player name already exists in the active event",
+    )
+    .await;
     assert_eq!(app.post_players("name=Rook".into()).await.status(), 200);
     // Simulate an imported player ahead of the counter.
     sqlx::query("UPDATE events SET next_pdn_code = 1")
@@ -118,12 +123,20 @@ async fn exhausted_event_returns_conflict_without_creating_a_player() {
         .unwrap();
     assert_eq!(app.post_players("name=Last".into()).await.status(), 200);
     // 9999 is reserved.
-    assert_registration_conflict(app.post_players("name=Overflow".into()).await).await;
+    assert_registration_conflict(
+        app.post_players("name=Overflow".into()).await,
+        "No PDN codes available for the active event",
+    )
+    .await;
     sqlx::query("UPDATE events SET next_pdn_code = 10000")
         .execute(&app.db_pool)
         .await
         .unwrap();
-    assert_registration_conflict(app.post_players("name=Overflow".into()).await).await;
+    assert_registration_conflict(
+        app.post_players("name=Overflow".into()).await,
+        "No PDN codes available for the active event",
+    )
+    .await;
     let count: i64 = sqlx::query_scalar("SELECT count(*) FROM players")
         .fetch_one(&app.db_pool)
         .await
