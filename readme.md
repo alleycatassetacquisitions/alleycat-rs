@@ -223,6 +223,12 @@ Run the test suite with:
 cargo test
 ```
 
+CI test and coverage jobs use PostgreSQL 18, matching Compose and database
+documentation generation. After the service passes its TCP health check, both
+jobs run `scripts/setup_ci_db.sh` to install SQLx CLI 0.8.6, create the application
+role, and migrate a fresh `alleycat` database. The script exports `DATABASE_URL`
+through `GITHUB_ENV` for subsequent checks.
+
 ### SQL query checking
 
 Prefer SQLx macros for static application queries. Document runtime-query
