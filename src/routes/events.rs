@@ -1,3 +1,4 @@
+use crate::routes::errors::database_error;
 use actix_web::{HttpResponse, error, web};
 use actix_web::{patch, post, put};
 use chrono::{DateTime, Utc};
@@ -57,18 +58,13 @@ fn validate_venue(venue: Option<&str>) -> actix_web::Result<()> {
     Ok(())
 }
 
-fn database_error(error: sqlx::Error) -> actix_web::Error {
-    tracing::error!(?error, "Event operation failed");
-    error::ErrorInternalServerError("Event operation failed")
-}
-
 #[utoipa::path(
     tag = "Events", summary = "Create an event",
     description = "Creates an event without making it active. Names are trimmed and must be nonblank. Names and venues cannot contain null characters.",
     request_body(content = CreateEvent, example = json!({"name": "Alleycat 2026", "venue_name": "Main Hall"})),
     responses((status = 201, description = "Event created", body = EventResponse),
         (status = 400, description = "Invalid JSON, unknown fields, or invalid name/venue"),
-        (status = 500, description = "Database operation failed"))
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
 )]
 #[post("/events")]
 pub async fn create_event(
@@ -87,7 +83,7 @@ pub async fn create_event(
     .bind(Utc::now())
     .fetch_one(pool.get_ref())
     .await
-    .map_err(database_error)?;
+    .map_err(|error| database_error(error, "Event operation failed"))?;
     Ok(HttpResponse::Created().json(event))
 }
 
@@ -99,7 +95,7 @@ pub async fn create_event(
     responses((status = 200, description = "Updated event", body = EventResponse),
         (status = 400, description = "Invalid body or no fields supplied"),
         (status = 404, description = "Event not found or invalid event ID"),
-        (status = 500, description = "Database operation failed"))
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
 )]
 #[patch("/events/{id}")]
 pub async fn update_event(
@@ -127,7 +123,7 @@ pub async fn update_event(
     .bind(body.venue_name.as_ref().and_then(|venue| venue.as_deref()))
     .fetch_optional(pool.get_ref())
     .await
-    .map_err(database_error)?
+    .map_err(|error| database_error(error, "Event operation failed"))?
     .ok_or_else(|| error::ErrorNotFound("Event not found"))?;
     Ok(HttpResponse::Ok().json(event))
 }
@@ -138,7 +134,7 @@ pub async fn update_event(
     params(("id" = Uuid, Path, description = "Event ID")),
     responses((status = 204, description = "Active event selected; empty body"),
         (status = 404, description = "Event not found or invalid event ID"),
-        (status = 500, description = "Database operation failed"))
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
 )]
 #[put("/events/{id}/active")]
 pub async fn set_active_event(
@@ -155,7 +151,7 @@ pub async fn set_active_event(
     .bind(*id)
     .fetch_optional(pool.get_ref())
     .await
-    .map_err(database_error)?;
+    .map_err(|error| database_error(error, "Event operation failed"))?;
     if selected.is_none() {
         return Err(error::ErrorNotFound("Event not found"));
     }

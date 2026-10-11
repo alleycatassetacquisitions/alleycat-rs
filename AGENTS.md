@@ -1,5 +1,13 @@
 # Repository guidance
 
+## Testing shared abstractions
+
+- Test shared behavior at the abstraction boundary rather than repeating the
+  same assertions at every call site. Adding a new use of an abstraction should
+  not require adding it to a central test inventory.
+- Add call-site tests for distinct behavior or meaningful integration risks;
+  use representative coverage when multiple callers follow the same path.
+
 ## API documentation
 
 - Update OpenAPI annotations alongside API changes.

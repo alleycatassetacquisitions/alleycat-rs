@@ -1,4 +1,4 @@
-use crate::helpers::{TestApp, spawn_app};
+use crate::helpers::{TestApp, assert_text_error, spawn_app};
 use reqwest::Method;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -137,26 +137,26 @@ async fn missing_events_do_not_change_the_active_selection() {
         204
     );
     let missing = Uuid::new_v4();
-    assert_eq!(
+    assert_text_error(
         app.request_json(
             Method::PUT,
             &format!("/events/{missing}/active"),
-            json!(null)
+            json!(null),
         )
-        .await
-        .status(),
-        404
-    );
-    assert_eq!(
+        .await,
+        404,
+    )
+    .await;
+    assert_text_error(
         app.request_json(
             Method::PATCH,
             &format!("/events/{missing}"),
-            json!({"name": "Missing"})
+            json!({"name": "Missing"}),
         )
-        .await
-        .status(),
-        404
-    );
+        .await,
+        404,
+    )
+    .await;
     assert_eq!(active(&app).await, Some(Uuid::parse_str(id).unwrap()));
 }
 

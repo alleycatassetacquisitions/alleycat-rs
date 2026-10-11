@@ -1,3 +1,4 @@
+mod database_errors;
 mod database_timeouts;
 mod device_logs;
 mod events;

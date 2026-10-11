@@ -1,5 +1,6 @@
 use crate::domain::{NewPlayer, PlayerEmail, PlayerName};
 use crate::events::lock_active_event;
+use crate::routes::errors::database_error;
 use actix_web::post;
 use actix_web::{HttpResponse, web};
 use chrono::Utc;
@@ -32,8 +33,8 @@ impl TryFrom<FormData> for NewPlayer {
     request_body(content = FormData, content_type = "application/x-www-form-urlencoded", example = json!({"name": "Alex", "email": "alex@example.com"})),
     responses((status = 200, description = "Player registered; empty body"),
         (status = 400, description = "Missing or invalid name or email"),
-        (status = 409, description = "No active event, duplicate name in the active event, or no PDN codes remaining", body = String, content_type = "text/plain"),
-        (status = 500, description = "Database operation failed"))
+        (status = 409, description = "No active event, duplicate name in the active event, or no PDN codes remaining. Text body without a Content-Type header.", body = String, content_type = "text/plain"),
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
 )]
 #[post("/players")]
 #[tracing::instrument(
@@ -62,8 +63,7 @@ pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>)
                 return HttpResponse::Conflict()
                     .body("Player name already exists in the active event");
             }
-            tracing::error!(?error, "Failed to register player");
-            HttpResponse::InternalServerError().finish()
+            database_error(error, "Failed to register player").error_response()
         }
     }
 }

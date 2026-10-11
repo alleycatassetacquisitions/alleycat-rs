@@ -1,3 +1,4 @@
+use crate::routes::errors;
 use actix_web::{HttpResponse, error, get, patch, post, web};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -33,8 +34,7 @@ fn database_error(error: sqlx::Error) -> actix_web::Error {
     if error.as_database_error().and_then(|e| e.constraint()) == Some("teams_event_name_key") {
         return error::ErrorConflict("Team name already exists in this event");
     }
-    tracing::error!(?error, "Team operation failed");
-    error::ErrorInternalServerError("Team operation failed")
+    errors::database_error(error, "Team operation failed")
 }
 
 #[utoipa::path(
@@ -47,7 +47,7 @@ fn database_error(error: sqlx::Error) -> actix_web::Error {
         (status = 400, description = "Invalid JSON, unknown fields, or invalid name"),
         (status = 404, description = "Event not found or invalid event ID"),
         (status = 409, description = "Name already exists in this event"),
-        (status = 500, description = "Database operation failed")
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain")
     )
 )]
 #[post("/events/{event_id}/teams")]
@@ -84,7 +84,7 @@ pub async fn create_team(
         (status = 400, description = "Invalid JSON, unknown fields, or invalid name"),
         (status = 404, description = "Team not found in this event or invalid ID"),
         (status = 409, description = "Name already exists in this event"),
-        (status = 500, description = "Database operation failed")
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain")
     )
 )]
 #[patch("/events/{event_id}/teams/{id}")]
@@ -116,7 +116,7 @@ pub async fn rename_team(
     responses(
         (status = 200, description = "Event teams", body = Vec<TeamResponse>),
         (status = 404, description = "Event not found or invalid event ID"),
-        (status = 500, description = "Database operation failed")
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain")
     )
 )]
 #[get("/events/{event_id}/teams")]

@@ -1,5 +1,6 @@
 mod device_logs;
 mod documentation;
+mod errors;
 mod events;
 #[path = "health_check.rs"]
 mod health;

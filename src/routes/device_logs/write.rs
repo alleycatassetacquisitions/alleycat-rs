@@ -1,4 +1,5 @@
 use crate::proto::alleycat::device::WriteDeviceLogRequest;
+use crate::routes::errors::database_error;
 use actix_web::http::header::CONTENT_TYPE;
 use actix_web::post;
 use actix_web::{HttpRequest, HttpResponse, error, web};
@@ -70,7 +71,7 @@ impl TryFrom<WriteDeviceLogRequest> for NewDeviceLog {
     responses((status = 204, description = "Report accepted; empty body"),
         (status = 400, description = "Invalid protobuf or missing/invalid report fields"),
         (status = 415, description = "Expected application/protobuf"),
-        (status = 500, description = "Database operation failed"))
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
 )]
 #[post("/device-logs")]
 pub async fn write_device_log(
@@ -96,10 +97,7 @@ pub async fn write_device_log(
 
     insert_device_log(&pool, &new_device_log)
         .await
-        .map_err(|error| {
-            tracing::error!(?error, "Failed to insert device log");
-            error::ErrorInternalServerError("Failed to insert device log")
-        })?;
+        .map_err(|error| database_error(error, "Failed to insert device log"))?;
 
     Ok(HttpResponse::NoContent().finish())
 }

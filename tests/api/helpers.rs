@@ -27,6 +27,20 @@ pub struct TestApp {
     pub db_pool: PgPool,
 }
 
+pub async fn assert_text_error(response: Response, status: u16) -> String {
+    assert_eq!(response.status(), status);
+    assert_eq!(
+        response.headers()["content-type"],
+        "text/plain; charset=utf-8"
+    );
+    let body = response.text().await.unwrap();
+    assert!(
+        !body.trim().is_empty(),
+        "Error response must explain the failure"
+    );
+    body
+}
+
 impl TestApp {
     pub fn request(&self, method: Method, path: &str) -> RequestBuilder {
         self.client.request(

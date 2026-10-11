@@ -1,7 +1,8 @@
 use crate::events::get_active_event_id;
+use crate::routes::errors::database_error;
 use crate::routes::pagination::{Pagination, PaginationQuery};
 use actix_web::get;
-use actix_web::{error::ErrorInternalServerError, web};
+use actix_web::web;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;
@@ -28,7 +29,7 @@ pub struct GetPlayersResponse {
     params(PaginationQuery),
     responses((status = 200, description = "Players and effective pagination", body = GetPlayersResponse),
         (status = 400, description = "Invalid pagination query"),
-        (status = 500, description = "Database operation failed"))
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
 )]
 #[get("/players")]
 #[tracing::instrument(name = "Retrieve players", skip(parameters))]
@@ -38,10 +39,9 @@ pub async fn get_players(
 ) -> actix_web::Result<web::Json<GetPlayersResponse>> {
     let pagination = parameters.normalize();
 
-    let players = fetch_players(&pool, &pagination).await.map_err(|error| {
-        tracing::error!(?error, "Failed to retrieve players");
-        ErrorInternalServerError("Failed to retrieve players")
-    })?;
+    let players = fetch_players(&pool, &pagination)
+        .await
+        .map_err(|error| database_error(error, "Failed to retrieve players"))?;
 
     Ok(web::Json(GetPlayersResponse {
         players,

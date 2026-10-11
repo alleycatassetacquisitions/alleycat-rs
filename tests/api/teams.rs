@@ -1,4 +1,4 @@
-use crate::helpers::{TestApp, spawn_app};
+use crate::helpers::{TestApp, assert_text_error, spawn_app};
 use reqwest::Method;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -43,12 +43,12 @@ async fn teams_start_empty_and_are_created_renamed_and_isolated_by_event() {
     Uuid::parse_str(id).unwrap();
     assert_eq!(created["name"], "Runners");
     assert_eq!(created["event_id"], first);
-    assert_eq!(
+    assert_text_error(
         app.request_json(Method::POST, &path, json!({"name": " Runners "}))
-            .await
-            .status(),
-        409
-    );
+            .await,
+        409,
+    )
+    .await;
     assert_eq!(
         app.request_json(
             Method::POST,
@@ -69,22 +69,22 @@ async fn teams_start_empty_and_are_created_renamed_and_isolated_by_event() {
         assert_eq!(renamed["id"], id);
         assert_eq!(renamed["name"], "Sprinters");
     }
-    assert_eq!(
+    assert_text_error(
         app.request_json(Method::PATCH, &rename, json!({"name": "Hunter"}))
-            .await
-            .status(),
-        409
-    );
-    assert_eq!(
+            .await,
+        409,
+    )
+    .await;
+    assert_text_error(
         app.request_json(
             Method::PATCH,
             &format!("/events/{second}/teams/{id}"),
-            json!({"name": "Wrong event"})
+            json!({"name": "Wrong event"}),
         )
-        .await
-        .status(),
-        404
-    );
+        .await,
+        404,
+    )
+    .await;
     assert!(
         teams(&app, first)
             .await
