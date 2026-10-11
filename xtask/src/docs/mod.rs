@@ -18,12 +18,22 @@ pub enum Command {
         /// Output directory, relative to the repository root unless absolute.
         #[arg(long, default_value = "docs/database")]
         output: PathBuf,
+        /// Fail if generated files differ from the output directory; do not write files.
+        #[arg(long)]
+        check: bool,
+        /// Verify the reset inventory in a second, freshly created container database.
+        #[arg(long)]
+        check_reset: bool,
     },
 }
 
 pub fn run(command: Command) -> Result<()> {
     match command {
-        Command::Db { output } => generate(output),
+        Command::Db {
+            output,
+            check,
+            check_reset,
+        } => generate(output, check, check_reset),
     }
 }
 
@@ -74,7 +84,7 @@ fn docker(args: &[&str], input: Option<&[u8]>) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn generate(output: PathBuf) -> Result<()> {
+fn generate(output: PathBuf, check: bool, check_reset: bool) -> Result<()> {
     let root = project_root()?;
     let output = root.join(output);
     let name = format!(
@@ -140,73 +150,110 @@ fn generate(output: PathBuf) -> Result<()> {
     if migrations.is_empty() {
         bail!("no SQL migrations found");
     }
-    for migration in migrations {
-        println!(
-            "Applying {}",
-            migration.file_name().unwrap().to_string_lossy()
-        );
+    db.migrate("docs", &migrations)?;
+    let schema = db.dump("docs", true)?;
+    let catalog = db.sql("docs", include_bytes!("catalog.sql"))?;
+    let markdown = render(&serde_json::from_str(&catalog)?);
+    if check_reset {
+        db.check_reset(&migrations)?;
+    }
+    let files = [("schema.sql", schema), ("README.md", markdown)];
+    if check {
+        let stale: Vec<_> = files
+            .iter()
+            .filter(|(name, contents)| {
+                fs::read(output.join(name)).ok().as_deref() != Some(contents.as_bytes())
+            })
+            .map(|(name, _)| output.join(name).display().to_string())
+            .collect();
+        if !stale.is_empty() {
+            bail!(
+                "Database documentation is stale or missing: {}. Run cargo xtask docs db (with the same --output, if specified) and commit the generated files.",
+                stale.join(", ")
+            );
+        }
+        println!("Database documentation is up to date.");
+    } else {
+        fs::create_dir_all(&output)?;
+        for (name, contents) in files {
+            fs::write(output.join(name), contents)?;
+            println!("Generated {}", output.join(name).display());
+        }
+    }
+    Ok(())
+}
+
+impl Database {
+    fn sql(&self, database: &str, sql: &[u8]) -> Result<String> {
         docker(
             &[
                 "exec",
                 "-i",
-                &db.0,
+                &self.0,
                 "psql",
                 "-X",
                 "-q",
+                "-A",
+                "-t",
                 "-v",
                 "ON_ERROR_STOP=1",
                 "-U",
                 "postgres",
                 "-d",
-                "docs",
+                database,
             ],
-            Some(&fs::read(&migration)?),
+            Some(sql),
         )
-        .with_context(|| format!("failed to apply {}", migration.display()))?;
     }
-    let schema = docker(
-        &[
-            "exec",
-            &db.0,
-            "pg_dump",
-            "-U",
-            "postgres",
-            "-d",
-            "docs",
-            "--schema-only",
-            "--no-owner",
-            "--no-privileges",
-        ],
-        None,
-    )?;
-    let catalog = docker(
-        &[
-            "exec",
-            "-i",
-            &db.0,
-            "psql",
-            "-X",
-            "-A",
-            "-t",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-U",
-            "postgres",
-            "-d",
-            "docs",
-        ],
-        Some(include_bytes!("catalog.sql")),
-    )?;
-    let markdown = render(&serde_json::from_str(&catalog)?);
-    fs::create_dir_all(&output)?;
-    fs::write(output.join("schema.sql"), normalize_dump(&schema))?;
-    fs::write(output.join("README.md"), markdown)?;
-    println!(
-        "Generated {} and {}",
-        output.join("schema.sql").display(),
-        output.join("README.md").display()
-    );
-    Ok(())
+
+    fn migrate(&self, database: &str, migrations: &[PathBuf]) -> Result<()> {
+        for migration in migrations {
+            println!(
+                "Applying {} to {database}",
+                migration.file_name().unwrap().to_string_lossy()
+            );
+            self.sql(database, &fs::read(migration)?)
+                .with_context(|| format!("failed to apply {}", migration.display()))?;
+        }
+        Ok(())
+    }
+
+    fn dump(&self, database: &str, schema_only: bool) -> Result<String> {
+        let mut args = vec!["exec", &self.0, "pg_dump", "-U", "postgres", "-d", database];
+        if schema_only {
+            args.extend(["--schema-only", "--no-owner", "--no-privileges"]);
+        }
+        Ok(normalize_dump(&docker(&args, None)?))
+    }
+
+    fn check_reset(&self, migrations: &[PathBuf]) -> Result<()> {
+        // This database can only be created in our new, network-isolated container.
+        // Never accept a URL or read application/cloud database configuration here.
+        self.sql("docs", b"CREATE DATABASE reset_check")?;
+        self.sql("reset_check", include_bytes!("reset_sentinels.sql"))?;
+        // Full dump includes unrelated data, sequence values, ownership and grants,
+        // as well as every schema object. No handwritten application inventory.
+        let baseline = self.dump("reset_check", false)?;
+        self.migrate("reset_check", migrations)?;
+        let migrated = self.dump("reset_check", true)?;
+        // The docs runner applies SQL directly, so create a ledger sentinel. Its
+        // columns/data are immaterial: reset must drop the entire SQLx table.
+        self.sql("reset_check", b"CREATE TABLE public._sqlx_migrations (version bigint PRIMARY KEY); INSERT INTO public._sqlx_migrations VALUES (1);")?;
+        self.sql("reset_check", include_bytes!("../../reset_remote_db.sql"))?;
+        if self.dump("reset_check", false)? != baseline {
+            bail!(
+                "Reset inventory check failed: application objects or the SQLx ledger remain, or unrelated objects/data were changed. Review xtask/reset_remote_db.sql."
+            );
+        }
+        self.migrate("reset_check", migrations)?;
+        if self.dump("reset_check", true)? != migrated {
+            bail!("Migrations after reset did not reproduce the original database.");
+        }
+        println!(
+            "Reset inventory removes application objects and the ledger, preserves unrelated objects/data, and allows migrations to reapply."
+        );
+        Ok(())
+    }
 }
 
 fn normalize_dump(input: &str) -> String {

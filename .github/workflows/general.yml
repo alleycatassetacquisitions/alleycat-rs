@@ -78,6 +78,9 @@ jobs:
       - name: Run tests
         run: cargo test
 
+      - name: Check generated database docs and reset inventory
+        run: cargo xtask docs db --check --check-reset
+
       - name: Check that queries are fresh
         run: cargo sqlx prepare --workspace --check -- --all-targets
 
