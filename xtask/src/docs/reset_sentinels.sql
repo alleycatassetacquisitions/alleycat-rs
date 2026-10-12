@@ -1,5 +1,13 @@
 -- Unrelated objects owned by the same role as the application. Broad schema or
 -- ownership-based resets must fail the before/after comparison.
+-- Extensions may already be installed by the provider or another application.
+-- Verify that reset preserves this shared dependency and its unrelated users.
+CREATE EXTENSION btree_gist;
+CREATE TABLE public.provider_reservations (
+    id uuid NOT NULL,
+    occupied tstzrange NOT NULL,
+    EXCLUDE USING gist (id WITH =, occupied WITH &&)
+);
 CREATE TYPE public.provider_status AS ENUM ('ready');
 CREATE TABLE public.provider_metadata (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

@@ -82,9 +82,9 @@ specification is available at `/openapi.json` (the AI friendly format).
 
 ## Database documentation
 
-The auto-generated [database schema reference](docs/database/README.md) is primarily
-for AI consumption at the moment. It documents tables, relationships, and
-constraints to help coding agents understand the current database structure.
+The [generated database schema reference](docs/database/schema.md) catalogs tables,
+columns, relationships, constraints, and indexes for development and tooling.
+For design rationale, see the [architecture decision records](docs/adr/README.md).
 
 With Docker running, regenerate it after migration changes:
 
@@ -112,6 +112,11 @@ use application database settings or `REMOTE_DB_URL`.
 The documentation tests use the production router without a database. They check
 OpenAPI references, operation IDs, path parameters, selected wire contracts, and
 self-contained ReDoc assets. They run as part of `cargo test` in CI.
+
+## Architecture decisions
+
+[Architecture decision records](docs/adr/README.md) explain significant design
+choices, their rationale, and tradeoffs.
 
 ## Routine commands
 

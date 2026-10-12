@@ -5,4 +5,5 @@ mod events;
 mod health_check;
 mod helpers;
 mod players;
+mod scoring;
 mod teams;

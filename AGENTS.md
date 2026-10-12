@@ -13,6 +13,16 @@
 - Update OpenAPI annotations alongside API changes.
 - Keep ReDoc self-contained: local assets and system fonts, no CDN dependencies.
 
+## Architecture decisions
+
+- Record significant architecture decisions and their tradeoffs in `docs/adr/`.
+  Follow its README and template; routine implementation changes do not need an ADR.
+- Read relevant accepted ADRs before changing the behavior they describe.
+- When a decision changes, add a superseding ADR and link both records rather
+  than rewriting the original rationale. Keep the ADR index current.
+- Keep API contracts in OpenAPI and schema details in generated database docs;
+  link to them from ADRs instead of duplicating reference documentation.
+
 ## Old codebase
 
 - For this project, "the old codebase" refers to the Hono/Bun server in
@@ -28,17 +38,21 @@
 - Until the release version, treat migrations as applying to a fresh database.
   Schema changes do not need to preserve existing development data or include
   data backfills or data-preserving transition migrations.
-  Always add new migrations for schema changes; do not modify existing migrations.
-  This keeps unapplied-migration detection in the xtask stack startup workflow
-  reliable. Squashing migrations is a separate, explicitly requested maintenance
-  task, not part of routine schema changes.
   The complete migration set must still apply successfully to an empty database.
+- Migrations already pushed to `main` are immutable: do not edit, rename, or
+  delete them. Changes to that schema require new migrations.
+- New migrations that have not reached `main` may be edited or consolidated
+  within the current change. Check the current remote `main` before doing so.
+  If an edited migration was already applied to a local development database,
+  that database must be rebuilt before reapplying the revised migrations.
+  Squashing published migration history remains a separate, explicitly requested
+  maintenance task.
 - Before release, revisit this policy. From release onward, schema changes must
   use forward migrations that preserve existing data unless explicitly agreed
   otherwise.
 - Whenever a migration is added or changed, run `cargo xtask docs db` with
   Docker running and include any regenerated changes to
-  `docs/database/README.md` and `docs/database/schema.sql` in the same change.
+  `docs/database/schema.md` and `docs/database/schema.sql` in the same change.
   Do not edit these generated files manually.
 - `cargo xtask cloud db reset` resets the
   disposable DigitalOcean database using `xtask/reset_remote_db.sql`, by
