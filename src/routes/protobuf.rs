@@ -2,19 +2,9 @@ use actix_web::{HttpMessage, HttpRequest, error};
 use prost::Message;
 
 // Describe the wire payload as binary, rather than a JSON array of byte values.
-pub(super) struct ProtobufBody;
-
-impl utoipa::PartialSchema for ProtobufBody {
-    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
-        use utoipa::openapi::schema::{KnownFormat, ObjectBuilder, SchemaFormat, Type};
-        ObjectBuilder::new()
-            .schema_type(Type::String)
-            .format(Some(SchemaFormat::KnownFormat(KnownFormat::Binary)))
-            .into()
-    }
-}
-
-impl utoipa::ToSchema for ProtobufBody {}
+#[derive(utoipa::ToSchema)]
+#[schema(value_type = String, format = Binary)]
+pub(super) struct ProtobufBody(());
 
 pub(super) fn decode<M: Message + Default>(
     request: &HttpRequest,
@@ -39,7 +29,12 @@ mod tests {
 
     #[test]
     fn protobuf_decoding_checks_media_type_and_wire_format() {
-        for value in ["application/protobuf", "Application/Protobuf; version=1"] {
+        for value in [
+            "application/protobuf",
+            "Application/Protobuf",
+            "application/protobuf; version=1",
+            " Application/Protobuf ; version=1 ",
+        ] {
             let request = TestRequest::default()
                 .insert_header((CONTENT_TYPE, value))
                 .to_http_request();
@@ -59,6 +54,7 @@ mod tests {
             let error =
                 decode::<WriteDeviceLogRequest>(&request.to_http_request(), &[]).unwrap_err();
             assert_eq!(error.as_response_error().status_code(), 415);
+            assert_eq!(error.to_string(), "Expected application/protobuf");
         }
     }
 }
