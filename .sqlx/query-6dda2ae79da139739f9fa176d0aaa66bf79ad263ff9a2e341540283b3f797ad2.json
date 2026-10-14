@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE event_scoring_periods\n             SET closes_at = GREATEST(clock_timestamp(), started_at + interval '1 microsecond')\n             WHERE event_id = $1 AND closes_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6dda2ae79da139739f9fa176d0aaa66bf79ad263ff9a2e341540283b3f797ad2"
+}

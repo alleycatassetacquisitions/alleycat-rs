@@ -189,6 +189,33 @@ async fn important_wire_contracts_survive_production_registration() {
 }
 
 #[tokio::test]
+async fn quickdraw_contract_documents_binary_batches_and_scoring_outcomes() {
+    let app = DocumentationApp::start().await;
+    let spec = app.spec().await;
+    let path = &spec["paths"]["/events/{event_id}/quickdraw-matches"];
+    let content = &path["post"]["requestBody"]["content"];
+    assert_eq!(content.as_object().unwrap().len(), 1);
+    assert_eq!(
+        content["application/protobuf"]["schema"],
+        json!({"type": "string", "format": "binary"})
+    );
+    assert!(
+        path["get"]["responses"]["200"]["content"]
+            .get("application/json")
+            .is_some()
+    );
+    assert_eq!(
+        spec["components"]["schemas"]["ScoringStatus"]["enum"],
+        json!([
+            "scoring",
+            "same_team",
+            "scoring_disabled",
+            "unassigned_team"
+        ])
+    );
+}
+
+#[tokio::test]
 async fn redoc_serves_local_assets_and_system_fonts() {
     let app = DocumentationApp::start().await;
     let page = app.get("/docs").await;

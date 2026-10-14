@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (p.id IS NOT NULL) AS \"enabled!\", p.started_at AS \"started_at?\"\n           FROM events e LEFT JOIN event_scoring_periods p\n             ON p.event_id = e.id AND p.closes_at IS NULL\n           WHERE e.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "enabled!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "started_at?",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "bcd324c5184c7ae7d36963cef2afd01620fb0e0549a828c595624e49352ee39c"
+}

@@ -6,6 +6,9 @@ mod events;
 mod health;
 mod pagination;
 mod players;
+mod protobuf;
+mod quickdraw;
+mod scoring;
 mod teams;
 mod version;
 
@@ -14,5 +17,7 @@ pub use documentation::configure_documentation;
 pub use events::*;
 pub use health::*;
 pub use players::*;
+pub use quickdraw::*;
+pub use scoring::*;
 pub use teams::*;
 pub use version::*;
