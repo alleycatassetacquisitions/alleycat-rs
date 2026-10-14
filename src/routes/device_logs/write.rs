@@ -1,25 +1,9 @@
 use crate::proto::alleycat::device::WriteDeviceLogRequest;
 use crate::routes::errors::database_error;
-use actix_web::http::header::CONTENT_TYPE;
+use crate::routes::protobuf::{self, ProtobufBody};
 use actix_web::post;
 use actix_web::{HttpRequest, HttpResponse, error, web};
-use prost::Message;
 use sqlx::PgPool;
-
-// Describe the wire payload as binary, rather than a JSON array of byte values.
-struct ProtobufBody;
-
-impl utoipa::PartialSchema for ProtobufBody {
-    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
-        use utoipa::openapi::schema::{KnownFormat, ObjectBuilder, SchemaFormat, Type};
-        ObjectBuilder::new()
-            .schema_type(Type::String)
-            .format(Some(SchemaFormat::KnownFormat(KnownFormat::Binary)))
-            .into()
-    }
-}
-
-impl utoipa::ToSchema for ProtobufBody {}
 
 struct NewDeviceLog {
     device_mac: sqlx::types::mac_address::MacAddress,
@@ -79,20 +63,7 @@ pub async fn write_device_log(
     body: web::Bytes,
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
-    let content_type = http_request
-        .headers()
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(';').next())
-        .map(str::trim);
-
-    if !content_type.is_some_and(|value| value.eq_ignore_ascii_case("application/protobuf")) {
-        return Err(error::ErrorUnsupportedMediaType(
-            "Expected application/protobuf",
-        ));
-    }
-
-    let report = WriteDeviceLogRequest::decode(body.as_ref()).map_err(error::ErrorBadRequest)?;
+    let report = protobuf::decode::<WriteDeviceLogRequest>(&http_request, &body)?;
     let new_device_log = NewDeviceLog::try_from(report).map_err(error::ErrorBadRequest)?;
 
     insert_device_log(&pool, &new_device_log)

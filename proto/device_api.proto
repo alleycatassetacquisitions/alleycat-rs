@@ -32,3 +32,34 @@ message WriteDeviceLogRequest {
   // FreeRTOS task active when the exception occurred.
   optional string task_name = 8;
 }
+
+// POST /events/{event_id}/quickdraw-matches, application/protobuf.
+// Send 1-100 completed matches for the explicit event. The batch is atomic:
+// 204 means every result was saved or already existed; failures save none.
+message WriteQuickdrawMatchesRequest {
+  repeated QuickdrawMatch matches = 1;
+}
+
+message QuickdrawMatch {
+  // Required UUID strings. Both devices must use the same shared match ID.
+  string id = 1;
+  string player_a_id = 2;
+  string player_b_id = 3;
+
+  // Match-time snapshots supplied by the devices, not current membership.
+  // Omit for an unassigned player; a present value must be a valid team UUID.
+  optional string player_a_team_id = 4;
+  optional string player_b_team_id = 5;
+
+  // Required despite proto3 optional: zero is valid, absence is not.
+  // Values must fit a signed 64-bit database integer.
+  optional uint64 player_a_draw_time_ms = 6;
+  optional uint64 player_b_draw_time_ms = 7;
+
+  // Required participant UUID. The server does not infer the winner from times.
+  string winner_player_id = 8;
+
+  // Required UTC milliseconds since 1970-01-01; nonnegative, through year 9999.
+  // The first accepted upload supplies the timestamp and all other fields.
+  optional int64 occurred_at_unix_ms = 9;
+}

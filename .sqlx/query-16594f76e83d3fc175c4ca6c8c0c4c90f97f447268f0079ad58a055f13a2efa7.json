@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO event_scoring_periods (event_id, started_at)\n             SELECT $1, GREATEST(clock_timestamp(), MAX(closes_at))\n             FROM event_scoring_periods WHERE event_id = $1\n             RETURNING started_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "16594f76e83d3fc175c4ca6c8c0c4c90f97f447268f0079ad58a055f13a2efa7"
+}

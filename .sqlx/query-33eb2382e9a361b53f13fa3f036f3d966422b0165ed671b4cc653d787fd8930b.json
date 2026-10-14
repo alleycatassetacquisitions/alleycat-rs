@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO quickdraw_matches\n             (id, event_id, player_a_id, player_b_id, player_a_team_id, player_b_team_id,\n              player_a_draw_time_ms, player_b_draw_time_ms, winner_player_id, occurred_at, scoring_status)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,\n                (CASE\n                    WHEN NOT EXISTS (SELECT 1 FROM event_scoring_periods\n                        WHERE event_id = $2 AND started_at <= $10\n                        AND (closes_at IS NULL OR $10 < closes_at)) THEN 'scoring_disabled'\n                    WHEN $5::uuid IS NULL OR $6::uuid IS NULL THEN 'unassigned_team'\n                    WHEN $5 = $6 THEN 'same_team'\n                    ELSE 'scoring'\n                 END)::quickdraw_scoring_status)\n             ON CONFLICT (id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Int8",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "33eb2382e9a361b53f13fa3f036f3d966422b0165ed671b4cc653d787fd8930b"
+}

@@ -1,5 +1,5 @@
-//! Database-boundary tests for the scoring migrations. There are no scoring
-//! routes yet; runtime SQL here exercises constraints and the ingestion contract.
+//! Database-boundary tests for the scoring migrations. Runtime SQL here exercises
+//! constraints and the ingestion contract; scoring controls have separate API tests.
 use crate::helpers::spawn_app;
 use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
