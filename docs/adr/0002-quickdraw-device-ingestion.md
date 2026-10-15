@@ -52,6 +52,9 @@ ADR 0001 still apply. Leaderboard formulas remain deferred.
 
 ## References
 
+- [Quickdraw matches table](../database/schema/public.quickdraw_matches.md)
+- [Scoring periods table](../database/schema/public.event_scoring_periods.md)
+- [Generated database schema](../database/schema/README.md)
 - [Device protobuf contract](../../proto/device_api.proto)
 - [Quickdraw routes and OpenAPI annotations](../../src/routes/quickdraw.rs)
 - [Scoring controls](../../src/routes/scoring.rs)

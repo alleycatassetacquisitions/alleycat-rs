@@ -1,11 +1,10 @@
 use crate::project::project_root;
 use anyhow::{Context, Result, bail};
 use clap::Subcommand;
-use serde_json::Value;
 use std::{
     fs,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command as Process, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -13,7 +12,7 @@ use std::{
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Export schema.sql and schema.md using a disposable PostgreSQL 18 container.
+    /// Export schema.sql and tbls Markdown using a disposable PostgreSQL 18 container.
     Db {
         /// Output directory, relative to the repository root unless absolute.
         #[arg(long, default_value = "docs/database")]
@@ -152,38 +151,74 @@ fn generate(output: PathBuf, check: bool, check_reset: bool) -> Result<()> {
     }
     db.migrate("docs", &migrations)?;
     let schema = db.dump("docs", true)?;
-    let catalog = db.sql("docs", include_bytes!("catalog.sql"))?;
-    let markdown = render(&serde_json::from_str(&catalog)?);
     if check_reset {
         db.check_reset(&migrations)?;
     }
-    let files = [("schema.sql", schema), ("schema.md", markdown)];
+    let schema_path = output.join("schema.sql");
     if check {
-        let stale: Vec<_> = files
-            .iter()
-            .filter(|(name, contents)| {
-                fs::read(output.join(name)).ok().as_deref() != Some(contents.as_bytes())
-            })
-            .map(|(name, _)| output.join(name).display().to_string())
-            .collect();
-        if !stale.is_empty() {
+        if fs::read(&schema_path).ok().as_deref() != Some(schema.as_bytes()) {
             bail!(
                 "Database documentation is stale or missing: {}. Run cargo xtask docs db (with the same --output, if specified) and commit the generated files.",
-                stale.join(", ")
+                schema_path.display()
             );
         }
-        println!("Database documentation is up to date.");
     } else {
         fs::create_dir_all(&output)?;
-        for (name, contents) in files {
-            fs::write(output.join(name), contents)?;
-            println!("Generated {}", output.join(name).display());
-        }
+        fs::write(&schema_path, schema)?;
+        println!("Generated {}", schema_path.display());
+    }
+    db.document(&output, check)?;
+    if check {
+        println!("Database documentation is up to date.");
     }
     Ok(())
 }
 
 impl Database {
+    fn document(&self, output: &Path, check: bool) -> Result<()> {
+        let output = output
+            .canonicalize()
+            .context("database documentation directory is missing")?;
+        let config = project_root()?.join(".tbls.yml");
+        let network = format!("container:{}", self.0);
+        let config_mount = format!("type=bind,src={},dst=/tbls.yml,readonly", config.display());
+        let output_mount = format!(
+            "type=bind,src={},dst=/docs{}",
+            output.display(),
+            if check { ",readonly" } else { "" }
+        );
+        // Join only the disposable database's isolated network namespace.
+        // The schema/ subdirectory is exclusively tbls-generated: --rm-dist
+        // removes obsolete table pages without touching the sibling SQL dump.
+        let mut command = Process::new("docker");
+        command.args([
+            "run",
+            "--rm",
+            "--network",
+            &network,
+            "--mount",
+            &config_mount,
+            "--mount",
+            &output_mount,
+            "ghcr.io/k1low/tbls:v1.96.1",
+            if check { "diff" } else { "doc" },
+            "--config",
+            "/tbls.yml",
+            "postgres://postgres@127.0.0.1:5432/docs?sslmode=disable",
+            "/docs/schema",
+        ]);
+        if !check {
+            command.args(["--force", "--rm-dist"]);
+        }
+        let status = command.status().context("could not run tbls in Docker")?;
+        if !status.success() {
+            bail!(
+                "tbls failed with {status}; run cargo xtask docs db to regenerate stale documentation"
+            );
+        }
+        Ok(())
+    }
+
     fn sql(&self, database: &str, sql: &[u8]) -> Result<String> {
         docker(
             &[
@@ -268,97 +303,4 @@ fn normalize_dump(input: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n")
         + "\n"
-}
-fn cell(value: &Value) -> String {
-    value
-        .as_str()
-        .unwrap_or("")
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('|', "&#124;")
-        .replace('`', "&#96;")
-        .replace('\r', "")
-        .replace('\n', "<br>")
-}
-fn diagram_label(s: &str) -> String {
-    s.replace('&', "#38;")
-        .replace('"', "#34;")
-        .replace('<', "#60;")
-        .replace('>', "#62;")
-        .replace(['\n', '\r'], " ")
-}
-fn render(catalog: &Value) -> String {
-    let tables = catalog["tables"].as_array().expect("catalog tables");
-    let names: Vec<String> = tables
-        .iter()
-        .map(|t| {
-            format!(
-                "{}.{}",
-                t["schema"].as_str().unwrap(),
-                t["name"].as_str().unwrap()
-            )
-        })
-        .collect();
-    let mut out = String::from(
-        "# Database schema reference (generated)\n\nThis file is an automatically generated catalog of tables, columns, constraints, and indexes, not a database usage guide.\n\nGenerated from the repository’s migrations. After changing migrations, run `cargo xtask docs db` with Docker running, then commit the updated documentation. Do not edit this file manually.\n\n[View the complete SQL schema](schema.sql).\n\n## Relationships\n\nArrows point from the referencing table to the referenced table. Labels show foreign key definitions; cardinality is not inferred.\n\n```mermaid\nflowchart LR\n",
-    );
-    for (i, name) in names.iter().enumerate() {
-        out.push_str(&format!("    t{i}[\"{}\"]\n", diagram_label(name)));
-    }
-    for r in catalog["relationships"].as_array().unwrap() {
-        if let (Some(from), Some(to)) = (
-            names
-                .iter()
-                .position(|n| Some(n.as_str()) == r["from"].as_str()),
-            names
-                .iter()
-                .position(|n| Some(n.as_str()) == r["to"].as_str()),
-        ) {
-            out.push_str(&format!(
-                "    t{from} -->|\"{}\"| t{to}\n",
-                diagram_label(r["definition"].as_str().unwrap())
-            ));
-        }
-    }
-    out.push_str("```\n\n## Enum types\n\n| Type | Values |\n| --- | --- |\n");
-    for e in catalog["enums"].as_array().unwrap() {
-        out.push_str(&format!(
-            "| {} | {} |\n",
-            cell(&e["name"]),
-            e["values"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(cell)
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-    }
-    for (t, name) in tables.iter().zip(names) {
-        out.push_str(&format!("\n## {}\n\n{}\n\n| Column | Type | Nullable | Default | Description |\n| --- | --- | --- | --- | --- |\n", cell(&Value::String(name)), cell(&t["comment"])));
-        for c in t["columns"].as_array().unwrap() {
-            out.push_str(&format!(
-                "| {} | {} | {} | {} | {} |\n",
-                cell(&c["name"]),
-                cell(&c["type"]),
-                if c["nullable"] == true { "yes" } else { "no" },
-                cell(&c["default"]),
-                cell(&c["comment"])
-            ));
-        }
-        out.push_str("\n### Constraints\n\n| Name | Definition |\n| --- | --- |\n");
-        for c in t["constraints"].as_array().unwrap() {
-            out.push_str(&format!(
-                "| {} | {} |\n",
-                cell(&c["name"]),
-                cell(&c["definition"])
-            ));
-        }
-        out.push_str("\n### Indexes\n\n| Definition |\n| --- |\n");
-        for i in t["indexes"].as_array().unwrap() {
-            out.push_str(&format!("| {} |\n", cell(i)));
-        }
-    }
-    out
 }

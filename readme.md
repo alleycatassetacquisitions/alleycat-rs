@@ -82,36 +82,11 @@ specification is available at `/openapi.json` (the AI friendly format).
 
 ## Database documentation
 
-The [generated database schema reference](docs/database/schema.md) catalogs tables,
-columns, relationships, constraints, and indexes for development and tooling.
-For design rationale, see the [architecture decision records](docs/adr/README.md).
+Browse the [database reference](docs/database/schema/README.md) for tables,
+relationships, and diagrams, or the [SQL schema](docs/database/schema.sql) for
+complete PostgreSQL definitions. Both are generated from the migrations.
 
-With Docker running, regenerate it after migration changes:
-
-```bash
-cargo xtask docs db
-```
-
-Run the same consistency checks as CI without rewriting generated files:
-
-```bash
-cargo xtask docs db --check --check-reset
-SQLX_OFFLINE=true cargo test --test documentation
-```
-
-The database command starts a disposable PostgreSQL 18 container with no network,
-published ports, or persistent volumes. `--check` compares both generated files
-against migrations. `--check-reset` creates another fresh database in that
-container, applies migrations, exercises `xtask/reset_remote_db.sql`, and checks
-that only application objects and a SQLx ledger sentinel disappear. Unrelated
-objects, data, and grants must survive, and migrations must apply again to produce
-the same database. The generator applies migration SQL directly; the ledger
-sentinel tests table removal, not SQLx migration bookkeeping. These checks never
-use application database settings or `REMOTE_DB_URL`.
-
-The documentation tests use the production router without a database. They check
-OpenAPI references, operation IDs, path parameters, selected wire contracts, and
-self-contained ReDoc assets. They run as part of `cargo test` in CI.
+For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/README.md).
 
 ## Architecture decisions
 
