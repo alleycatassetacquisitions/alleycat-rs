@@ -12,6 +12,9 @@
 
 - Update OpenAPI annotations alongside API changes.
 - Keep ReDoc self-contained: local assets and system fonts, no CDN dependencies.
+- Keep device message fields and validation requirements in the `.proto` comments.
+  After protobuf changes, run `cargo xtask docs proto` with Docker running and
+  include the generated `static/device-apis/index.html`; do not edit it manually.
 
 ## Architecture decisions
 

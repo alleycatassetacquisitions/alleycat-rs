@@ -77,8 +77,13 @@ and already assigned values.
 
 ## API documentation
 
-Open `/docs` on the running server to browse the API in ReDoc. The OpenAPI
-specification is available at `/openapi.json` (the AI friendly format).
+Open `/` on the running server for links to:
+
+- `/docs` — HTTP API documentation in ReDoc.
+- `/docs/device-apis` — protobuf messages and field descriptions.
+- `/openapi.json` — the machine-readable HTTP specification.
+
+For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/README.md).
 
 ## Database documentation
 

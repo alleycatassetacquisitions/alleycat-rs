@@ -6,15 +6,44 @@ pub fn configure_documentation(config: &mut web::ServiceConfig, mut api: OpenApi
     api.info = Info::new("Alleycat API", env!("CARGO_PKG_VERSION"));
     api.info.description = Some(
         "HTTP API for the Alleycat Rust server. Player operations use the active event. \
-         These routes currently do not enforce authentication."
+         These routes currently do not enforce authentication.\n\n\
+         [Device APIs](/docs/device-apis) — protobuf message fields, types, and validation requirements."
             .into(),
     );
     config
+        .route("/", web::get().to(api_index))
         .route("/docs", web::get().to(redoc_page))
+        .route("/docs/device-apis", web::get().to(device_apis))
+        .route("/docs/device-apis.css", web::get().to(device_apis_css))
+        .route("/docs/device_api.proto", web::get().to(device_proto))
         .route("/docs/redoc.js", web::get().to(redoc_script))
         .route("/docs/redoc-logo.svg", web::get().to(redoc_logo))
         .route("/openapi.json", web::get().to(openapi))
         .app_data(web::Data::new(api));
+}
+
+async fn api_index() -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(include_str!("../../static/index.html"))
+}
+
+async fn device_apis() -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(include_str!("../../static/device-apis/index.html"))
+}
+
+async fn device_apis_css() -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("text/css; charset=utf-8")
+        .body(include_str!("../../static/device-apis/style.css"))
+}
+
+async fn device_proto() -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("text/plain; charset=utf-8")
+        .body(include_str!("../../proto/device_api.proto"))
 }
 
 async fn redoc_page() -> HttpResponse {

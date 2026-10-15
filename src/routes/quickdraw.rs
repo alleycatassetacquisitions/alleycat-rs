@@ -85,7 +85,30 @@ fn match_error(error: sqlx::Error) -> actix_web::Error {
 
 #[utoipa::path(
     tag = "Quickdraw", summary = "Upload completed quickdraw matches",
-    description = "Send binary alleycat.device.WriteQuickdrawMatchesRequest from proto/device_api.proto, containing 1–100 matches (maximum request body 256 KiB). All UUID fields are required except team IDs: omit a team for an unassigned player. Teams are device-supplied match-time snapshots, never inferred from current membership. Draw times must be present unsigned milliseconds fitting i64; zero is valid. occurred_at_unix_ms must be present UTC Unix milliseconds from 1970 through year 9999. Players must be distinct and the explicit winner must be a participant. New matches must reference players and teams in this event. Scoring is decided by historical periods at occurrence time: outside a period, then unassigned team, then same team, otherwise scoring. The batch is atomic. Valid duplicate reports in the same event succeed without changing any stored fields, including receipt time and scoring. For repeated IDs within a batch, the first occurrence wins. An ID already stored in another event rejects the batch. Uses the explicit event, regardless of active selection.",
+    description = r##"Send `alleycat.device.WriteQuickdrawMatchesRequest` encoded as binary protobuf.
+Use the [protobuf definition](/docs/device_api.proto) to generate your client messages.
+Supply **1–100 matches**, with a maximum request body of **256 KiB**.
+Uses the explicit event, regardless of active selection.
+
+See [Device APIs: WriteQuickdrawMatchesRequest](/docs/device-apis#alleycat.device.WriteQuickdrawMatchesRequest)
+for message fields, protobuf types, and validation requirements.
+
+### Validation and scoring
+
+- Players must be distinct, and the explicit winner must be a participant.
+- New matches must reference players and teams in this event.
+- Teams are device-supplied match-time snapshots, never inferred from current membership.
+- Scoring uses historical periods at occurrence time. The first applicable outcome wins:
+  outside a scoring period, unassigned team, same team, otherwise scoring.
+
+### Atomicity and duplicate reports
+
+- The batch is atomic: failures save none of its matches.
+- Valid duplicate reports in the same event succeed without changing stored fields,
+  including receipt time and scoring.
+- For repeated IDs within a batch, the first occurrence wins.
+- An ID already stored in another event rejects the batch.
+"##,
     params(("event_id" = Uuid, Path, description = "Event ID")),
     request_body(content = inline(ProtobufBody), content_type = "application/protobuf"),
     responses(

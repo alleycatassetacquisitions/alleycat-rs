@@ -238,9 +238,75 @@ async fn redoc_serves_local_assets_and_system_fonts() {
     for (path, content_type) in [
         ("/docs/redoc.js", "text/javascript; charset=utf-8"),
         ("/docs/redoc-logo.svg", "image/svg+xml"),
+        ("/docs/device-apis.css", "text/css; charset=utf-8"),
+        ("/docs/device_api.proto", "text/plain; charset=utf-8"),
     ] {
         let response = app.get(path).await;
         assert_eq!(response.headers()["content-type"], content_type);
         assert!(!response.bytes().await.unwrap().is_empty());
     }
+}
+
+#[tokio::test]
+async fn device_docs_are_local_and_linked_from_the_http_reference() {
+    let app = DocumentationApp::start().await;
+    let root = app.get("/").await;
+    assert_eq!(root.headers()["content-type"], "text/html; charset=utf-8");
+    let root = root.text().await.unwrap();
+    assert!(root.contains("href=\"/docs/device-apis\">Device APIs</a>"));
+    assert!(root.contains("href=\"/docs\""));
+    let page = app.get("/docs/device-apis").await;
+    assert_eq!(page.headers()["content-type"], "text/html; charset=utf-8");
+    let html = page.text().await.unwrap();
+    assert!(html.contains("href=\"/docs/device-apis.css\""));
+    assert!(html.contains("system-ui, sans-serif"));
+    assert!(html.contains("crash_number"));
+    assert!(html.contains("9223372036854775807"));
+    for external in [
+        "https://fonts.",
+        "src=\"https://",
+        "src=\"http://",
+        "href=\"//",
+        "@import",
+        "@font-face",
+    ] {
+        assert!(!html.contains(external), "external dependency: {external}");
+    }
+    let spec = app.spec().await;
+    assert!(
+        spec["info"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("[Device APIs](/docs/device-apis)")
+    );
+    // Check message links wherever they occur, without an endpoint inventory.
+    fn check_message_links(value: &Value, html: &str) -> usize {
+        match value {
+            Value::Object(object) => object.values().map(|v| check_message_links(v, html)).sum(),
+            Value::Array(array) => array.iter().map(|v| check_message_links(v, html)).sum(),
+            Value::String(text) => text
+                .split("(/docs/device-apis#")
+                .skip(1)
+                .map(|link| {
+                    let anchor = link.split(')').next().unwrap();
+                    assert!(
+                        html.contains(&format!("id=\"{anchor}\"")),
+                        "missing device message anchor: {anchor}"
+                    );
+                    1
+                })
+                .sum(),
+            _ => 0,
+        }
+    }
+    assert!(check_message_links(&spec, &html) > 0);
+    // Source download and rendered docs are embedded in the same server build.
+    assert_eq!(
+        app.get("/docs/device_api.proto")
+            .await
+            .text()
+            .await
+            .unwrap(),
+        include_str!("../proto/device_api.proto")
+    );
 }

@@ -50,7 +50,16 @@ impl TryFrom<WriteDeviceLogRequest> for NewDeviceLog {
 
 #[utoipa::path(
     tag = "Device logs", summary = "Submit a device crash report",
-    description = "Send a binary alleycat.device.WriteDeviceLogRequest encoded using proto/device_api.proto. Required fields: device_mac (48-bit MAC address), crash_number, uptime_ms, reset_reason. crash_number and uptime_ms must fit a signed 64-bit integer; reset_reason must fit a signed 32-bit integer. Optional fields: software_version, program_counter, exception_cause, task_name. Repeated (device_mac, crash_number) reports are ignored and still return 204.",
+    description = r##"Send `alleycat.device.WriteDeviceLogRequest` encoded as binary protobuf.
+Use the [protobuf definition](/docs/device_api.proto) to generate your client messages.
+
+See [Device APIs: WriteDeviceLogRequest](/docs/device-apis#alleycat.device.WriteDeviceLogRequest)
+for message fields, protobuf types, and validation requirements.
+
+### Duplicate reports
+
+Repeated `(device_mac, crash_number)` reports are ignored and still return **204**.
+"##,
     request_body(content = inline(ProtobufBody), content_type = "application/protobuf"),
     responses((status = 204, description = "Report accepted; empty body"),
         (status = 400, description = "Invalid protobuf or missing/invalid report fields"),

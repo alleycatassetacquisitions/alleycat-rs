@@ -8,19 +8,22 @@ package alleycat.device;
 // - id
 // - received_at
 message WriteDeviceLogRequest {
-  // Colon-separated 48-bit address, such as "aa:bb:cc:dd:ee:ff".
+  // Required by the server. Colon-separated 48-bit address, such as "aa:bb:cc:dd:ee:ff".
   optional string device_mac = 1;
 
-  // Device-assigned crash report number.
+  // Required by the server. Device-assigned crash report number. Zero is valid.
+  // Must fit a signed 64-bit integer (maximum 9223372036854775807).
   optional uint64 crash_number = 2;
 
-  // Milliseconds since the device booted\
+  // Required by the server. Milliseconds since the device booted. Zero is valid.
+  // Must fit a signed 64-bit integer (maximum 9223372036854775807).
   optional uint64 uptime_ms = 3;
 
   // Firmware/software build identifier.
   optional string software_version = 4;
 
-  // Raw numeric reset-reason code reported by the device.
+  // Required by the server. Raw numeric reset-reason code reported by the device.
+  // Must fit a signed 32-bit integer (maximum 2147483647). Zero is valid.
   optional uint32 reset_reason = 5;
 
   // Address of the instruction being executed when the exception occurred.
@@ -37,29 +40,36 @@ message WriteDeviceLogRequest {
 // Send 1-100 completed matches for the explicit event. The batch is atomic:
 // 204 means every result was saved or already existed; failures save none.
 message WriteQuickdrawMatchesRequest {
+  // Required batch of 1-100 completed matches. Maximum encoded request body: 256 KiB.
   repeated QuickdrawMatch matches = 1;
 }
 
 message QuickdrawMatch {
   // Required UUID strings. Both devices must use the same shared match ID.
   string id = 1;
+  // Required first participant's player UUID.
   string player_a_id = 2;
+  // Required second participant's player UUID; must differ from player_a_id.
   string player_b_id = 3;
 
   // Match-time snapshots supplied by the devices, not current membership.
   // Omit for an unassigned player; a present value must be a valid team UUID.
   optional string player_a_team_id = 4;
+  // Second participant's team UUID at match time. Omit for an unassigned player.
   optional string player_b_team_id = 5;
 
   // Required despite proto3 optional: zero is valid, absence is not.
-  // Values must fit a signed 64-bit database integer.
+  // Must fit a signed 64-bit integer (maximum 9223372036854775807).
   optional uint64 player_a_draw_time_ms = 6;
+  // Second participant's unsigned draw time in milliseconds. Required; zero is valid.
+  // Must fit a signed 64-bit integer (maximum 9223372036854775807).
   optional uint64 player_b_draw_time_ms = 7;
 
   // Required participant UUID. The server does not infer the winner from times.
   string winner_player_id = 8;
 
   // Required UTC milliseconds since 1970-01-01; nonnegative, through year 9999.
+  // Maximum 253402300799999.
   // The first accepted upload supplies the timestamp and all other fields.
   optional int64 occurred_at_unix_ms = 9;
 }
