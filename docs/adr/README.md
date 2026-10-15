@@ -38,5 +38,6 @@ context and rationale; typo fixes, clarifications, and repaired links are fine.
 
 | ADR | Status | Date |
 | --- | --- | --- |
-| [0001: Quickdraw results and scoring periods](0001-quickdraw-results-and-scoring-periods.md) | Accepted | 2026-10-11 |
+| [0001: Quickdraw results and scoring periods](0001-quickdraw-results-and-scoring-periods.md) | Partially superseded by 0003 | 2026-10-11 |
 | [0002: Quickdraw device ingestion](0002-quickdraw-device-ingestion.md) | Accepted | 2026-10-11 |
+| [0003: Reversible delayed scoring](0003-reversible-delayed-scoring.md) | Accepted | 2026-10-15 |

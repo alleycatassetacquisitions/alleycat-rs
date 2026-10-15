@@ -52,6 +52,7 @@ erDiagram
   text venue_name
   integer next_pdn_code
   timestamp_with_time_zone created_at
+  boolean accepting_delayed_scores
 }
 ```
 

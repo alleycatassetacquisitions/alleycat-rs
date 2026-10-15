@@ -210,7 +210,8 @@ async fn quickdraw_contract_documents_binary_batches_and_scoring_outcomes() {
             "scoring",
             "same_team",
             "scoring_disabled",
-            "unassigned_team"
+            "unassigned_team",
+            "delayed_scores_disabled"
         ])
     );
 }
