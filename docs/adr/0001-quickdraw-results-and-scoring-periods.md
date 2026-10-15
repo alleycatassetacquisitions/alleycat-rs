@@ -48,7 +48,9 @@ other modes, voiding, and award snapshots are deferred.
 
 ## References
 
-- [Generated database schema](../database/schema.md)
+- [Quickdraw matches table](../database/schema/public.quickdraw_matches.md)
+- [Scoring periods table](../database/schema/public.event_scoring_periods.md)
+- [Generated database schema](../database/schema/README.md)
 - [Scoring period migration](../../migrations/20261011120000_create_event_scoring_periods.sql)
 - [Quickdraw migration](../../migrations/20261011121000_create_quickdraw_matches.sql)
 - [Database tests](../../tests/api/scoring.rs)

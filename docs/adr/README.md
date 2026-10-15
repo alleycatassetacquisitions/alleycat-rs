@@ -14,7 +14,7 @@ do not need one. Keep each record focused on one decision or a closely related
 set of decisions.
 
 Use OpenAPI for current API contracts, the
-[generated database reference](../database/schema.md) for schema details, and the
+[generated database reference](../database/schema/README.md) for schema details, and the
 [project README](../../readme.md) for operating instructions. Link to those sources
 and the implementation where useful.
 

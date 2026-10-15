@@ -1,0 +1,14 @@
+# Used by `cargo xtask docs db`; the runner supplies the isolated database DSN
+# and output path explicitly. No application or remote database is contacted.
+requiredVersion: '1.96.1'
+name: Alleycat database
+desc: |
+  Generated from migrations with tbls. Run `cargo xtask docs db` to regenerate;
+  do not edit these files manually.
+
+  [Complete PostgreSQL schema, including enum values and routines](../schema.sql).
+  [Architecture decisions](../../adr/README.md).
+er:
+  format: mermaid
+# Keep the checked artifacts to Markdown and the separate pg_dump SQL export.
+disableOutputSchema: true

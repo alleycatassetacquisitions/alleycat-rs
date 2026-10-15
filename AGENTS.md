@@ -52,7 +52,7 @@
   otherwise.
 - Whenever a migration is added or changed, run `cargo xtask docs db` with
   Docker running and include any regenerated changes to
-  `docs/database/schema.md` and `docs/database/schema.sql` in the same change.
+  `docs/database/schema/` and `docs/database/schema.sql` in the same change.
   Do not edit these generated files manually.
 - `cargo xtask cloud db reset` resets the
   disposable DigitalOcean database using `xtask/reset_remote_db.sql`, by
