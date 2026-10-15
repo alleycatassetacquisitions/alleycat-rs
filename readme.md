@@ -60,8 +60,10 @@ names and existing player memberships.
 
 Players are registered and listed within the active event. A fresh, unseeded
 database has no active event: player registration returns `409 Conflict` and
-player listing is empty. Create events with `POST /events` and select one with
-`PUT /events/{id}/active`. New events have no teams.
+player listing is empty. List all events with `GET /events`: it returns a JSON
+array containing each event's `id`, `name`, `venue_name`, and `created_at`, newest
+first (or an empty array when none exist). Create events with `POST /events` and
+select one with `PUT /events/{id}/active`. New events have no teams.
 List or create teams with `GET` or `POST /events/{event_id}/teams`; rename one
 with `PATCH /events/{event_id}/teams/{id}`. Creation and renaming accept JSON
 `{"name": "Runners"}`. After trimming, names must contain 1–256 Unicode scalar

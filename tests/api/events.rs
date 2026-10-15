@@ -10,6 +10,60 @@ async fn active(app: &TestApp) -> Option<Uuid> {
 }
 
 #[tokio::test]
+async fn event_listing_returns_all_events_for_registration_without_changing_selection() {
+    let app = spawn_app().await;
+    let response = app.get("/events").await;
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.headers()["content-type"], "application/json");
+    assert_eq!(response.json::<Value>().await.unwrap(), json!([]));
+
+    let first = app
+        .create_event(json!({"name": "First", "venue_name": "Hall"}))
+        .await;
+    let second = app.create_event(json!({"name": "Second"})).await;
+    // Check deterministic ordering even when timestamps tie.
+    sqlx::query("UPDATE events SET created_at = '2026-01-01T00:00:00Z'")
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+    let mut expected = vec![first, second];
+    for event in &mut expected {
+        event["created_at"] = json!("2026-01-01T00:00:00Z");
+    }
+    expected.sort_by(|a, b| b["id"].as_str().unwrap().cmp(a["id"].as_str().unwrap()));
+    let listed: Value = app.get("/events").await.json().await.unwrap();
+    assert_eq!(listed, json!(expected));
+    assert_eq!(active(&app).await, None);
+
+    // Use an ID returned by the listing to select the registration event.
+    let selected = listed[0]["id"].as_str().unwrap();
+    assert_eq!(
+        app.request_json(
+            Method::PUT,
+            &format!("/events/{selected}/active"),
+            json!(null)
+        )
+        .await
+        .status(),
+        204
+    );
+    let newest = app.create_event(json!({"name": "Newest"})).await;
+    expected.insert(0, newest);
+    assert_eq!(
+        app.get("/events").await.json::<Value>().await.unwrap(),
+        json!(expected)
+    );
+    assert_eq!(active(&app).await, Some(Uuid::parse_str(selected).unwrap()));
+    assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
+    let registered_event: Uuid =
+        sqlx::query_scalar("SELECT event_id FROM players WHERE name = 'Nyx'")
+            .fetch_one(&app.db_pool)
+            .await
+            .unwrap();
+    assert_eq!(registered_event, Uuid::parse_str(selected).unwrap());
+}
+
+#[tokio::test]
 async fn events_can_be_created_edited_and_switched_without_losing_players_or_codes() {
     let app = spawn_app().await;
     let first = app
