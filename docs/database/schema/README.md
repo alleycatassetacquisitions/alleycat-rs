@@ -13,7 +13,7 @@ do not edit these files manually.
 
 | Name | Columns | Comment | Type |
 | ---- | ------- | ------- | ---- |
-| [public.players](public.players.md) | 7 |  | BASE TABLE |
+| [public.players](public.players.md) | 8 |  | BASE TABLE |
 | [public.player_roles](public.player_roles.md) | 2 |  | BASE TABLE |
 | [public.device_logs](public.device_logs.md) | 10 |  | BASE TABLE |
 | [public.events](public.events.md) | 6 |  | BASE TABLE |
@@ -65,6 +65,7 @@ erDiagram
   timestamp_with_time_zone created_at
   uuid event_id FK
   uuid team_id FK
+  boolean active
 }
 "public.player_roles" {
   uuid player_id FK

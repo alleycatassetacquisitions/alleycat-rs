@@ -189,6 +189,36 @@ async fn important_wire_contracts_survive_production_registration() {
 }
 
 #[tokio::test]
+async fn player_contract_separates_staff_json_from_device_protobuf_and_patch_nulls() {
+    let app = DocumentationApp::start().await;
+    let spec = app.spec().await;
+    let device = &spec["paths"]["/device/players/by-pin/{pin}"]["get"];
+    assert!(device.get("requestBody").is_none());
+    let content = &device["responses"]["200"]["content"];
+    assert_eq!(content.as_object().unwrap().len(), 1);
+    assert_eq!(
+        content["application/protobuf"]["schema"],
+        json!({"type": "string", "format": "binary"})
+    );
+    let created = &spec["paths"]["/players"]["post"]["responses"]["200"]["content"]["application/json"]
+        ["schema"];
+    assert_eq!(created["$ref"], "#/components/schemas/PlayerResponse");
+    let update = &spec["components"]["schemas"]["UpdatePlayer"];
+    assert_eq!(update["additionalProperties"], false);
+    assert_eq!(update["properties"]["active"]["type"], "boolean");
+    assert_eq!(update["properties"]["name"]["type"], "string");
+    for field in ["email", "team_id"] {
+        assert_eq!(
+            update["properties"][field]["type"],
+            json!(["string", "null"])
+        );
+    }
+    for field in ["id", "event_id", "pdn_code", "created_at"] {
+        assert!(update["properties"].get(field).is_none());
+    }
+}
+
+#[tokio::test]
 async fn quickdraw_contract_documents_binary_batches_and_scoring_outcomes() {
     let app = DocumentationApp::start().await;
     let spec = app.spec().await;

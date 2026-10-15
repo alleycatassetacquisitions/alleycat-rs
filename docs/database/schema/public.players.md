@@ -11,11 +11,13 @@
 | created_at | timestamp with time zone |  | false |  |  |  |
 | event_id | uuid |  | false | [public.quickdraw_matches](public.quickdraw_matches.md) | [public.events](public.events.md) [public.teams](public.teams.md) |  |
 | team_id | uuid |  | true |  | [public.teams](public.teams.md) |  |
+| active | boolean | true | false |  |  | Reversible registration/device status, initially true. Inactive players retain their PIN, name, event, and match history and remain discoverable. This flag does not change accepted scores or reject delayed match uploads. |
 
 ## Constraints
 
 | Name | Type | Definition |
 | ---- | ---- | ---------- |
+| players_active_not_null | n | NOT NULL active |
 | players_created_at_not_null | n | NOT NULL created_at |
 | players_event_id_not_null | n | NOT NULL event_id |
 | players_id_not_null | n | NOT NULL id |
@@ -58,6 +60,7 @@ erDiagram
   timestamp_with_time_zone created_at
   uuid event_id FK
   uuid team_id FK
+  boolean active
 }
 "public.player_roles" {
   uuid player_id FK

@@ -1,9 +1,10 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::routes::{
     VersionInfo, configure_documentation, create_event, create_team, get_device_logs,
-    get_game_state, get_players, get_quickdraw_matches, get_scoring, get_version, health_check,
-    list_events, list_teams, register_player, rename_team, set_active_event, set_delayed_scores,
-    set_scoring, update_event, write_device_log, write_quickdraw_matches,
+    get_device_player_by_pin, get_game_state, get_player, get_player_by_pin, get_players,
+    get_quickdraw_matches, get_scoring, get_version, health_check, list_events, list_teams,
+    register_player, rename_team, set_active_event, set_delayed_scores, set_scoring, update_event,
+    update_player, write_device_log, write_quickdraw_matches,
 };
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
@@ -36,6 +37,10 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
             .service(get_device_logs)
             .service(write_device_log)
             .service(get_players)
+            .service(get_player_by_pin)
+            .service(get_device_player_by_pin)
+            .service(get_player)
+            .service(update_player)
             .service(register_player)
             .service(list_events)
             .service(create_event)

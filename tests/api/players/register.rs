@@ -13,6 +13,8 @@ async fn register_player_returns_a_200_for_valid_form_data() {
     let response = app.post_players(body.into()).await;
 
     assert_eq!(200, response.status().as_u16());
+    assert_eq!(response.headers()["content-type"], "application/json");
+    let created: serde_json::Value = response.json().await.unwrap();
     let saved = sqlx::query!("SELECT name, email, pdn_code FROM players",)
         .fetch_one(&app.db_pool)
         .await
@@ -22,6 +24,17 @@ async fn register_player_returns_a_200_for_valid_form_data() {
     assert_eq!(saved.email, Some("ursula_le_guin@gmail.com".to_string()));
     assert_eq!(saved.pdn_code.len(), 4);
     assert!(saved.pdn_code.chars().all(|c| c.is_ascii_digit()));
+    assert_eq!(created["name"], saved.name);
+    assert_eq!(created["email"], saved.email.unwrap());
+    assert_eq!(created["pdn_code"], saved.pdn_code);
+    assert_eq!(created["active"], true);
+    assert!(created["id"].is_string());
+    assert!(created["event_id"].is_string());
+    assert!(created["created_at"].is_string());
+    assert_eq!(created.get("team_id"), Some(&serde_json::Value::Null));
+    assert_eq!(created.get("team_name"), Some(&serde_json::Value::Null));
+    let roster: serde_json::Value = app.get_players().await.json().await.unwrap();
+    assert_eq!(roster["players"][0], created);
 }
 
 #[tokio::test]
@@ -153,6 +166,12 @@ async fn concurrent_registrations_allocate_distinct_sequential_codes() {
     );
     assert_eq!(first.status(), 200);
     assert_eq!(second.status(), 200);
+    let first: serde_json::Value = first.json().await.unwrap();
+    let second: serde_json::Value = second.json().await.unwrap();
+    assert_eq!(first["name"], "Nyx");
+    assert_eq!(second["name"], "Rook");
+    assert_ne!(first["id"], second["id"]);
+    assert_ne!(first["pdn_code"], second["pdn_code"]);
     let codes: Vec<String> = sqlx::query_scalar("SELECT pdn_code FROM players ORDER BY pdn_code")
         .fetch_all(&app.db_pool)
         .await

@@ -1,3 +1,4 @@
+use super::PlayerResponse;
 use crate::domain::{NewPlayer, PlayerEmail, PlayerName};
 use crate::events::lock_active_event;
 use crate::routes::errors::database_error;
@@ -9,7 +10,7 @@ use uuid::Uuid;
 
 #[derive(serde::Deserialize, utoipa::ToSchema)]
 pub struct FormData {
-    /// Nonblank name, at most 256 graphemes; cannot contain / ( ) \" < > \\ { }.
+    /// Nonblank name, at most 256 graphemes; cannot contain null characters or / ( ) \" < > \\ { }.
     #[schema(example = "Alex")]
     name: String,
     /// Optional valid email address.
@@ -31,7 +32,7 @@ impl TryFrom<FormData> for NewPlayer {
     tag = "Players", summary = "Register a player in the active event",
     description = "Creates a player in the active event and allocates a four-digit PDN sequentially, skipping reserved and already assigned codes. New players have no team (team_id is null). Submit URL-encoded form data, not JSON.",
     request_body(content = FormData, content_type = "application/x-www-form-urlencoded", example = json!({"name": "Alex", "email": "alex@example.com"})),
-    responses((status = 200, description = "Player registered; empty body"),
+    responses((status = 200, description = "Registered player with assigned PIN, email, team details, and status", body = PlayerResponse),
         (status = 400, description = "Missing or invalid name or email"),
         (status = 409, description = "No active event, duplicate name in the active event, or no PDN codes remaining. Text body without a Content-Type header.", body = String, content_type = "text/plain"),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
@@ -51,7 +52,7 @@ pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>)
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
     match insert_player(&pool, &new_player).await {
-        Ok(_) => HttpResponse::Ok().finish(),
+        Ok(player) => HttpResponse::Ok().json(player),
         Err(RegistrationError::NoActiveEvent) => HttpResponse::Conflict().body("No active event"),
         Err(RegistrationError::CodesExhausted) => {
             HttpResponse::Conflict().body("No PDN codes available for the active event")
@@ -85,7 +86,10 @@ impl From<sqlx::Error> for RegistrationError {
 }
 
 #[tracing::instrument(name = "Adding a player to the database", skip(new_player, pool))]
-async fn insert_player(pool: &PgPool, new_player: &NewPlayer) -> Result<(), RegistrationError> {
+async fn insert_player(
+    pool: &PgPool,
+    new_player: &NewPlayer,
+) -> Result<PlayerResponse, RegistrationError> {
     let mut transaction = pool.begin().await?;
     // Keep the selection locked through allocation, persistence, and commit.
     let event_id = lock_active_event(&mut transaction)
@@ -117,12 +121,23 @@ async fn insert_player(pool: &PgPool, new_player: &NewPlayer) -> Result<(), Regi
     .await?
     .ok_or(RegistrationError::CodesExhausted)?;
 
-    sqlx::query!(
-        "INSERT INTO players (id, event_id, pdn_code, name, email, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
-        Uuid::new_v4(), event_id, code, new_player.name.as_ref(),
-        new_player.email.as_ref().map(|email| email.as_ref()), Utc::now()
+    let player = sqlx::query_as!(
+        PlayerResponse,
+        r#"WITH inserted AS (
+            INSERT INTO players (id, event_id, pdn_code, name, email, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+        )
+        SELECT p.id, p.event_id, p.pdn_code, p.name, p.email, p.created_at, p.team_id,
+               t.name AS "team_name?", p.active
+        FROM inserted p LEFT JOIN teams t ON t.id = p.team_id AND t.event_id = p.event_id"#,
+        Uuid::new_v4(),
+        event_id,
+        code,
+        new_player.name.as_ref(),
+        new_player.email.as_ref().map(|email| email.as_ref()),
+        Utc::now()
     )
-    .execute(&mut *transaction)
+    .fetch_one(&mut *transaction)
     .await?;
     sqlx::query!(
         "UPDATE events SET next_pdn_code = $2::text::integer + 1 WHERE id = $1",
@@ -132,5 +147,5 @@ async fn insert_player(pool: &PgPool, new_player: &NewPlayer) -> Result<(), Regi
     .execute(&mut *transaction)
     .await?;
     transaction.commit().await?;
-    Ok(())
+    Ok(player)
 }

@@ -41,4 +41,5 @@ context and rationale; typo fixes, clarifications, and repaired links are fine.
 | [0001: Quickdraw results and scoring periods](0001-quickdraw-results-and-scoring-periods.md) | Partially superseded by 0003 | 2026-10-11 |
 | [0002: Quickdraw device ingestion](0002-quickdraw-device-ingestion.md) | Accepted | 2026-10-11 |
 | [0003: Reversible delayed scoring](0003-reversible-delayed-scoring.md) | Accepted | 2026-10-15 |
+| [0004: Player lifecycle and device lookups](0004-player-lifecycle-and-device-lookups.md) | Accepted | 2026-10-15 |
 | [0005: Extension-free scoring-period constraints](0005-extension-free-scoring-periods.md) | Accepted | 2026-10-16 |

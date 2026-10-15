@@ -1,5 +1,122 @@
 use crate::helpers::{assert_json, spawn_app, spawn_app_with_event};
-use serde_json::Value;
+use alleycat_rs::proto::alleycat::device::DevicePlayerResponse;
+use prost::Message;
+use reqwest::Method;
+use reqwest::header::CONTENT_TYPE;
+use serde_json::{Value, json};
+
+#[tokio::test]
+async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_email() {
+    let app = spawn_app_with_event().await;
+    let first: Value = app
+        .post_players("name=Alex&email=private-address%40example.com".into())
+        .await
+        .json()
+        .await
+        .unwrap();
+    let pin = first["pdn_code"].as_str().unwrap();
+    assert_eq!(pin, "0001");
+    let id_path = format!("/players/{}", first["id"].as_str().unwrap());
+    let pin_path = format!("/players/by-pin/{pin}");
+    let device_path = format!("/device/players/by-pin/{pin}");
+    for path in [&id_path, &pin_path] {
+        let response = app.get(path).await;
+        assert_eq!(response.status(), 200);
+        assert_eq!(response.json::<Value>().await.unwrap(), first);
+    }
+    let response = app.get(&device_path).await;
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.headers()["content-type"], "application/protobuf");
+    let bytes = response.bytes().await.unwrap();
+    assert!(
+        !bytes
+            .windows(b"private-address@example.com".len())
+            .any(|window| window == b"private-address@example.com")
+    );
+    let device = DevicePlayerResponse::decode(bytes).unwrap();
+    assert_eq!(device.id, first["id"].as_str().unwrap());
+    assert_eq!(device.event_id, first["event_id"].as_str().unwrap());
+    assert_eq!(device.pdn_code, pin);
+    assert_eq!(device.name, "Alex");
+    assert_eq!(device.team_id, None);
+    assert_eq!(device.team_name, None);
+    assert!(device.active);
+    let created: chrono::DateTime<chrono::Utc> =
+        first["created_at"].as_str().unwrap().parse().unwrap();
+    assert_eq!(device.created_at_unix_ms, created.timestamp_millis());
+
+    let team_response = app
+        .request_json(
+            Method::POST,
+            &format!("/events/{}/teams", device.event_id),
+            json!({"name": "Runners"}),
+        )
+        .await;
+    assert_eq!(team_response.status(), 201);
+    let team: Value = team_response.json().await.unwrap();
+    assert_eq!(
+        app.request_json(
+            Method::PATCH,
+            &id_path,
+            json!({"team_id": team["id"], "active": false})
+        )
+        .await
+        .status(),
+        200
+    );
+    assert_eq!(
+        app.request_json(
+            Method::PATCH,
+            &format!(
+                "/events/{}/teams/{}",
+                device.event_id,
+                team["id"].as_str().unwrap()
+            ),
+            json!({"name": "Renamed team"})
+        )
+        .await
+        .status(),
+        200
+    );
+    let device =
+        DevicePlayerResponse::decode(app.get(&device_path).await.bytes().await.unwrap()).unwrap();
+    assert_eq!(device.team_id.as_deref(), team["id"].as_str());
+    assert_eq!(device.team_name.as_deref(), Some("Renamed team"));
+    assert!(!device.active);
+    let by_pin: Value = app.get(&pin_path).await.json().await.unwrap();
+    assert_eq!(by_pin["team_name"], "Renamed team");
+    assert_eq!(by_pin["email"], first["email"]);
+
+    app.activate_new_event().await;
+    let second: Value = app
+        .post_players("name=Second".into())
+        .await
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(second["pdn_code"], pin);
+    assert_eq!(app.get(&id_path).await.status(), 404);
+    assert_eq!(
+        app.get(&pin_path).await.json::<Value>().await.unwrap(),
+        second
+    );
+    let device =
+        DevicePlayerResponse::decode(app.get(&device_path).await.bytes().await.unwrap()).unwrap();
+    assert_eq!(device.id, second["id"].as_str().unwrap());
+    for path in ["/players/by-pin/1", "/device/players/by-pin/abcd"] {
+        assert_eq!(app.get(path).await.status(), 400);
+    }
+    for path in ["/players/by-pin/9876", "/device/players/by-pin/9876"] {
+        assert_eq!(app.get(path).await.status(), 404);
+    }
+    sqlx::query("UPDATE app_state SET active_event_id = NULL")
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+    for path in [&id_path, &pin_path, &device_path] {
+        assert_eq!(app.get(path).await.status(), 404);
+    }
+}
 
 #[tokio::test]
 async fn player_is_retrieved_with_a_200() {
