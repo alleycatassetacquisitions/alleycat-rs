@@ -58,32 +58,22 @@ The seed creates a development event and selects it only if no event is active.
 It adds Hunter and Bounty teams with stable UUIDs; reseeding preserves their
 names and existing player memberships.
 
-Players are registered and listed within the active event. A fresh, unseeded
-database has no active event: player registration returns `409 Conflict` and
-player listing is empty. List all events with `GET /events`: it returns a JSON
-array containing each event's `id`, `name`, `venue_name`, and `created_at`, newest
-first (or an empty array when none exist). Create events with `POST /events` and
-select one with `PUT /events/{id}/active`. New events have no teams.
-List or create teams with `GET` or `POST /events/{event_id}/teams`; rename one
-with `PATCH /events/{event_id}/teams/{id}`. Creation and renaming accept JSON
-`{"name": "Runners"}`. After trimming, names must contain 1–256 Unicode scalar
-values and no null characters. Names are case-sensitive unique within each
-event (duplicates return 409).
-Team routes use the explicit event, not the active selection. Renaming preserves
-the team's UUID and memberships. Registration leaves `team_id` null, which is
-also how unassigned players appear in listings.
-These routes do not provide deletion or membership changes.
-Registration also returns `409 Conflict` for a duplicate name within the active
-event or exhausted PDN codes. Codes are allocated sequentially, skipping reserved
-and already assigned values.
-
 ## API documentation
 
-Open `/` on the running server for links to:
+The running server provides the API reference for its version:
 
-- `/docs` — HTTP API documentation in ReDoc.
-- `/docs/device-apis` — protobuf messages and field descriptions.
-- `/openapi.json` — the machine-readable HTTP specification.
+- [HTTP API documentation](http://localhost:8000/docs) — endpoints, request and
+  response formats, validation, and errors.
+- [Device API documentation](http://localhost:8000/docs/device-apis) — protobuf
+  messages, fields, and validation requirements.
+- [OpenAPI specification](http://localhost:8000/openapi.json) — the
+  machine-readable HTTP contract.
+
+These links use the default local address. Use your server's host and configured
+port for another deployment, or open its home page for documentation links.
+HTTP contracts are maintained in the route OpenAPI annotations; device message
+contracts are maintained in the `.proto` comments. This README covers setup and
+operations rather than duplicating that reference.
 
 For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/README.md).
 
@@ -101,12 +91,6 @@ For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/R
 choices, their rationale, and tradeoffs.
 
 ## Routine commands
-
-### Identify a deployment
-
-`GET /version` returns the deployed commit SHA and its GitHub URL. Missing commit
-metadata returns null for both fields; a missing repository URL returns null for
-`commit_url` only.
 
 ### Manage the local stack
 

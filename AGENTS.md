@@ -11,6 +11,13 @@
 ## API documentation
 
 - Update OpenAPI annotations alongside API changes.
+- Keep HTTP endpoint contracts in OpenAPI annotations and device message contracts
+  in `.proto` comments. The generated API docs are the reference for consumers.
+- Keep the README focused on setup, operations, and links to the generated docs.
+  Do not duplicate endpoint inventories, request/response fields, payload examples,
+  status-code tables, or validation rules there. Operational commands such as a
+  deployment health check are fine. When moving existing details out of the
+  README, preserve any missing contract information in its authoritative source.
 - Keep ReDoc self-contained: local assets and system fonts, no CDN dependencies.
 - Keep device message fields and validation requirements in the `.proto` comments.
   After protobuf changes, run `cargo xtask docs proto` with Docker running and

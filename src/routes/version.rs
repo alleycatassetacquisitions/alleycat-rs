@@ -4,7 +4,9 @@ use actix_web::{HttpResponse, web};
 /// Deployment metadata captured once, before the server starts.
 #[derive(serde::Serialize, utoipa::ToSchema)]
 pub struct VersionInfo {
+    /// Deployed commit SHA; null when commit metadata is unavailable.
     commit: Option<String>,
+    /// Commit URL; null when the commit SHA or repository URL is unavailable.
     commit_url: Option<String>,
 }
 
