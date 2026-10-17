@@ -2,46 +2,61 @@
 
 - Status: Accepted
 - Date: 2026-10-15
-- Supersedes: [0001](0001-quickdraw-results-and-scoring-periods.md) for delayed-match eligibility; its storage, timing, and historical-credit decisions remain in effect.
+- Supersedes: [0001](0001-quickdraw-results-and-scoring-periods.md) only for deciding whether late uploads can score. Its decisions about storing matches, using match time, and preserving past results still apply.
 
 ## Context
 
-Operators need to stop awarding points for late uploads without permanently
-finalizing an event. Previously, a match inside any historical scoring period
-remained eligible regardless of when it arrived. Devices must still be able to
-upload their records while delayed scoring is disabled.
+Devices can upload a match after scoring has been turned off. Until now, that
+match could still earn points as long as it happened while scoring was on.
+
+We want operators to be able to turn those late points off and back on. They
+don't need to permanently finalize an event, and we still want to keep the match
+records even when they won't count toward the score.
 
 ## Decision
 
-Each event has a reversible delayed-score switch, enabled by default. An upload
-is delayed when its occurrence time belongs to a scoring period that is already
-closed at ingestion. When the switch is off, such a new match is saved with the
-distinct non-scoring status `delayed_scores_disabled`. Matches in the open period
-remain eligible; matches outside all periods remain non-scoring.
+Each event gets an "accept delayed scores" switch, on by default. Operators can
+change it independently of whether scoring is currently on.
 
-The switch is read under the same event lock used for scoring-period changes
-and ingestion. A subsequent statement observes the setting after acquiring the
-lock. The first accepted report still fixes every stored field and the scoring
-decision. Re-enabling affects only newly accepted matches, never existing records
-or retries. Team snapshots and historical credit remain unchanged.
+For this switch, a match is late if it happened during a scoring period that
+has ended by the time the server processes the upload. With the switch off, we
+save the match as `delayed_scores_disabled` and award no points. Matches from the
+currently open period can still score. Matches that happened while scoring was
+off still don't count.
 
-The game-status read uses one database statement to return a coherent snapshot
-of the active event and its settings, with the database's UTC clock.
+Once we've accepted a match, its details and scoring decision stay put. Turning
+the switch back on only affects matches we haven't accepted yet. Uploading the
+same match again won't change its points or which teams receive credit.
+
+Uploads and changes to either scoring switch take the same lock on the event.
+After getting that lock, an upload reads the settings in a separate database
+statement. This matters when an upload has to wait for a setting change: it must
+use the setting that was just saved, not the one from before it started waiting.
+
+The game-state endpoint reads the active event, its settings, and the database's
+UTC time in one query so the response describes a single snapshot.
 
 ## Alternatives considered
 
-- Permanent finalization would prevent operators from reversing the setting.
-- Rejecting uploads would force devices to retain and retry otherwise valid data.
-- Recomputing saved results when toggling would make scores change retroactively
-  and break first-report-wins ingestion.
-- An arbitrary age threshold would require a separate definition of lateness;
-  closed scoring periods already establish the relevant boundary.
+- Permanently finalizing an event would stop late points, but operators couldn't
+  turn them back on.
+- Rejecting late uploads would leave devices holding valid match records and
+  retrying them. We'd rather save those records without awarding points.
+- Recalculating past results whenever the switch changes would make existing
+  scores change and undo our rule that the first accepted report determines the
+  result.
+- Using a time limit, such as a maximum upload age, would add another rule for
+  operators and devices to understand. The end of a scoring period already gives
+  us a clear cutoff.
 
 ## Consequences
 
-An operator can stop late points while continuing to collect match records.
-Re-enabling does not restore points for matches accepted while the switch was
-off. A future correction or adjudication workflow would be a separate decision.
+Operators can stop late uploads from adding points without losing the records
+of those matches.
+
+The tradeoff is that turning the switch back on won't restore points for matches
+accepted while it was off. If we later need a way to correct those results, we'll
+design that separately rather than make this switch rewrite past scores.
 
 ## References
 
