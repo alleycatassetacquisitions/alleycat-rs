@@ -12,10 +12,10 @@ pub struct SetScoring {
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
-struct ScoringState {
-    enabled: bool,
+pub(super) struct ScoringState {
+    pub(super) enabled: bool,
     /// Inclusive start of the current period; null while scoring is disabled.
-    started_at: Option<DateTime<Utc>>,
+    pub(super) started_at: Option<DateTime<Utc>>,
 }
 
 fn scoring_error(error: sqlx::Error) -> actix_web::Error {

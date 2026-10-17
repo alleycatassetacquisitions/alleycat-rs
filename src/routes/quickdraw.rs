@@ -99,7 +99,8 @@ for message fields, protobuf types, and validation requirements.
 - New matches must reference players and teams in this event.
 - Teams are device-supplied match-time snapshots, never inferred from current membership.
 - Scoring uses historical periods at occurrence time. The first applicable outcome wins:
-  outside a scoring period, unassigned team, same team, otherwise scoring.
+  outside a scoring period, closed period with delayed scores disabled, unassigned team,
+  same team, otherwise scoring. The delayed-score switch never changes saved results.
 
 ### Atomicity and duplicate reports
 
@@ -162,6 +163,10 @@ pub async fn write_quickdraw_matches(
                     WHEN NOT EXISTS (SELECT 1 FROM event_scoring_periods
                         WHERE event_id = $2 AND started_at <= $10
                         AND (closes_at IS NULL OR $10 < closes_at)) THEN 'scoring_disabled'
+                    WHEN NOT (SELECT accepting_delayed_scores FROM events WHERE id = $2)
+                        AND EXISTS (SELECT 1 FROM event_scoring_periods
+                            WHERE event_id = $2 AND started_at <= $10 AND $10 < closes_at)
+                        THEN 'delayed_scores_disabled'
                     WHEN $5::uuid IS NULL OR $6::uuid IS NULL THEN 'unassigned_team'
                     WHEN $5 = $6 THEN 'same_team'
                     ELSE 'scoring'
@@ -201,6 +206,7 @@ enum ScoringStatus {
     SameTeam,
     ScoringDisabled,
     UnassignedTeam,
+    DelayedScoresDisabled,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]

@@ -201,6 +201,127 @@ async fn retries_preserve_the_first_report_including_receipt_time() {
 }
 
 #[tokio::test]
+async fn delayed_score_switch_records_closed_period_matches_without_rescoring_retries() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let start = 1_790_000_000_000;
+    game.period(&app, start, Some(start + 1000)).await;
+    game.period(&app, start + 2000, None).await;
+    let path = format!("/events/{}/delayed-scores", game.event);
+    assert_eq!(
+        game.upload(&app, vec![game.report(1, start)])
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(
+        app.request_json(Method::PUT, &path, json!({"enabled": false}))
+            .await
+            .status(),
+        200
+    );
+    let mut unassigned = game.report(6, start);
+    unassigned.player_a_team_id = None;
+    let mut same_team = game.report(7, start);
+    same_team.player_b_team_id = same_team.player_a_team_id.clone();
+    assert_eq!(
+        game.upload(
+            &app,
+            vec![
+                game.report(1, start),
+                game.report(2, start),
+                game.report(3, start + 2000),
+                game.report(4, start + 1000),
+                unassigned,
+                same_team
+            ]
+        )
+        .await
+        .status(),
+        204
+    );
+    let before = game.list(&app).await;
+    for (id, status) in [
+        (1, "scoring"),
+        (2, "delayed_scores_disabled"),
+        (3, "scoring"),
+        (4, "scoring_disabled"),
+        (6, "delayed_scores_disabled"),
+        (7, "delayed_scores_disabled"),
+    ] {
+        let row = before["matches"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == Uuid::from_u128(id).to_string())
+            .unwrap();
+        assert_eq!(row["scoring_status"], status);
+    }
+    assert_eq!(
+        app.request_json(Method::PUT, &path, json!({"enabled": true}))
+            .await
+            .status(),
+        200
+    );
+    assert_eq!(
+        game.upload(&app, vec![game.report(2, start)])
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(game.list(&app).await, before);
+    assert_eq!(
+        game.upload(&app, vec![game.report(5, start)])
+            .await
+            .status(),
+        204
+    );
+    let after = game.list(&app).await;
+    let row = after["matches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["id"] == Uuid::from_u128(5).to_string())
+        .unwrap();
+    assert_eq!(row["scoring_status"], "scoring");
+}
+
+#[tokio::test]
+async fn ingestion_reads_the_delayed_score_setting_after_waiting_for_its_update() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let start = 1_790_000_000_000;
+    game.period(&app, start, Some(start + 1000)).await;
+    let mut transaction = app.db_pool.begin().await.unwrap();
+    sqlx::query("UPDATE events SET accepting_delayed_scores = false WHERE id = $1")
+        .bind(game.event)
+        .execute(&mut *transaction)
+        .await
+        .unwrap();
+    let request = app
+        .request(Method::POST, &game.path())
+        .header("Content-Type", "application/protobuf")
+        .body(
+            WriteQuickdrawMatchesRequest {
+                matches: vec![game.report(1, start)],
+            }
+            .encode_to_vec(),
+        );
+    let mut upload = tokio::spawn(async move { request.send().await.unwrap() });
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(150), &mut upload)
+            .await
+            .is_err()
+    );
+    transaction.commit().await.unwrap();
+    assert_eq!(upload.await.unwrap().status(), 204);
+    assert_eq!(
+        game.list(&app).await["matches"][0]["scoring_status"],
+        "delayed_scores_disabled"
+    );
+}
+
+#[tokio::test]
 async fn invalid_event_references_roll_back_the_whole_batch() {
     let app = spawn_app().await;
     let game = Game::create(&app).await;

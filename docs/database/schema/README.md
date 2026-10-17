@@ -16,7 +16,7 @@ do not edit these files manually.
 | [public.players](public.players.md) | 7 |  | BASE TABLE |
 | [public.player_roles](public.player_roles.md) | 2 |  | BASE TABLE |
 | [public.device_logs](public.device_logs.md) | 10 |  | BASE TABLE |
-| [public.events](public.events.md) | 5 |  | BASE TABLE |
+| [public.events](public.events.md) | 6 |  | BASE TABLE |
 | [public.reserved_pdn_codes](public.reserved_pdn_codes.md) | 2 |  | BASE TABLE |
 | [public.app_state](public.app_state.md) | 2 |  | BASE TABLE |
 | [public.teams](public.teams.md) | 3 |  | BASE TABLE |
@@ -245,7 +245,7 @@ do not edit these files manually.
 | Name | Values |
 | ---- | ------- |
 | public.player_role | courier, miniboss, staff |
-| public.quickdraw_scoring_status | same_team, scoring, scoring_disabled, unassigned_team |
+| public.quickdraw_scoring_status | delayed_scores_disabled, same_team, scoring, scoring_disabled, unassigned_team |
 
 ## Relations
 
@@ -295,6 +295,7 @@ erDiagram
   text venue_name
   integer next_pdn_code
   timestamp_with_time_zone created_at
+  boolean accepting_delayed_scores
 }
 "public.reserved_pdn_codes" {
   text code

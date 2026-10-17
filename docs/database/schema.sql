@@ -49,7 +49,8 @@ CREATE TYPE public.quickdraw_scoring_status AS ENUM (
     'scoring',
     'same_team',
     'scoring_disabled',
-    'unassigned_team'
+    'unassigned_team',
+    'delayed_scores_disabled'
 );
 
 
@@ -136,8 +137,16 @@ CREATE TABLE public.events (
     venue_name text,
     next_pdn_code integer DEFAULT 1 NOT NULL,
     created_at timestamp with time zone NOT NULL,
+    accepting_delayed_scores boolean DEFAULT true NOT NULL,
     CONSTRAINT events_next_pdn_code_check CHECK (((next_pdn_code >= 1) AND (next_pdn_code <= 10000)))
 );
+
+
+--
+-- Name: COLUMN events.accepting_delayed_scores; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.events.accepting_delayed_scores IS 'Reversible per-event switch, default true. When false, new matches from closed scoring periods are recorded as delayed_scores_disabled. Open-period scoring and previously accepted results are unchanged.';
 
 
 --
@@ -188,7 +197,7 @@ CREATE TABLE public.quickdraw_matches (
     CONSTRAINT quickdraw_matches_player_a_draw_time_ms_check CHECK ((player_a_draw_time_ms >= 0)),
     CONSTRAINT quickdraw_matches_player_b_draw_time_ms_check CHECK ((player_b_draw_time_ms >= 0)),
     CONSTRAINT quickdraw_matches_received_at_check CHECK (isfinite(received_at)),
-    CONSTRAINT quickdraw_matches_scoring_teams_check CHECK (((scoring_status = 'scoring_disabled'::public.quickdraw_scoring_status) OR (scoring_status =
+    CONSTRAINT quickdraw_matches_scoring_teams_check CHECK ((((scoring_status)::text = ANY (ARRAY['scoring_disabled'::text, 'delayed_scores_disabled'::text])) OR (scoring_status =
 CASE
     WHEN ((player_a_team_id IS NULL) OR (player_b_team_id IS NULL)) THEN 'unassigned_team'::public.quickdraw_scoring_status
     WHEN (player_a_team_id = player_b_team_id) THEN 'same_team'::public.quickdraw_scoring_status
@@ -265,7 +274,7 @@ COMMENT ON COLUMN public.quickdraw_matches.received_at IS 'Defaults to the datab
 -- Name: COLUMN quickdraw_matches.scoring_status; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.quickdraw_matches.scoring_status IS 'Scoring decision supplied by ingestion and stored with the first accepted result. Use event and device occurrence time to check scoring periods: no matching period -> scoring_disabled; either team missing -> unassigned_team; equal teams -> same_team; otherwise scoring. No period reference is retained. The database checks team consistency; period lookup belongs to ingestion.';
+COMMENT ON COLUMN public.quickdraw_matches.scoring_status IS 'First accepted scoring decision: outside a scoring period -> scoring_disabled; closed period with delayed scores disabled -> delayed_scores_disabled; either team missing -> unassigned_team; equal teams -> same_team; otherwise scoring. Ingestion checks period history and the event switch under the event row lock. The database checks team consistency; duplicates never rescore.';
 
 
 --

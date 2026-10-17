@@ -19,7 +19,7 @@ Completed two-player quickdraw results, including non-scoring duels. Ingestion m
 | winner_player_id | uuid |  | false |  |  | Explicit device-reported winner; must be one of the two participants. No inferred winner from draw times. |
 | occurred_at | timestamp with time zone |  | false |  |  | Trusted UTC device timestamp from the first accepted upload. Use for scoring periods, daily boundaries and match chronology. |
 | received_at | timestamp with time zone | clock_timestamp() | false |  |  | Defaults to the database clock at insertion. Ingestion must omit this field and preserve the first accepted result on duplicate uploads. Not the time used for scoring eligibility. |
-| scoring_status | quickdraw_scoring_status |  | false |  |  | Scoring decision supplied by ingestion and stored with the first accepted result. Use event and device occurrence time to check scoring periods: no matching period -\> scoring_disabled; either team missing -\> unassigned_team; equal teams -\> same_team; otherwise scoring. No period reference is retained. The database checks team consistency; period lookup belongs to ingestion. |
+| scoring_status | quickdraw_scoring_status |  | false |  |  | First accepted scoring decision: outside a scoring period -\> scoring_disabled; closed period with delayed scores disabled -\> delayed_scores_disabled; either team missing -\> unassigned_team; equal teams -\> same_team; otherwise scoring. Ingestion checks period history and the event switch under the event row lock. The database checks team consistency; duplicates never rescore. |
 
 ## Constraints
 
@@ -39,7 +39,7 @@ Completed two-player quickdraw results, including non-scoring duels. Ingestion m
 | quickdraw_matches_received_at_check | CHECK | CHECK (isfinite(received_at)) |
 | quickdraw_matches_received_at_not_null | n | NOT NULL received_at |
 | quickdraw_matches_scoring_status_not_null | n | NOT NULL scoring_status |
-| quickdraw_matches_scoring_teams_check | CHECK | CHECK (((scoring_status = 'scoring_disabled'::quickdraw_scoring_status) OR (scoring_status =<br />CASE<br />    WHEN ((player_a_team_id IS NULL) OR (player_b_team_id IS NULL)) THEN 'unassigned_team'::quickdraw_scoring_status<br />    WHEN (player_a_team_id = player_b_team_id) THEN 'same_team'::quickdraw_scoring_status<br />    ELSE 'scoring'::quickdraw_scoring_status<br />END))) |
+| quickdraw_matches_scoring_teams_check | CHECK | CHECK ((((scoring_status)::text = ANY (ARRAY['scoring_disabled'::text, 'delayed_scores_disabled'::text])) OR (scoring_status =<br />CASE<br />    WHEN ((player_a_team_id IS NULL) OR (player_b_team_id IS NULL)) THEN 'unassigned_team'::quickdraw_scoring_status<br />    WHEN (player_a_team_id = player_b_team_id) THEN 'same_team'::quickdraw_scoring_status<br />    ELSE 'scoring'::quickdraw_scoring_status<br />END))) |
 | quickdraw_matches_winner_is_participant | CHECK | CHECK (((winner_player_id = player_a_id) OR (winner_player_id = player_b_id))) |
 | quickdraw_matches_winner_player_id_not_null | n | NOT NULL winner_player_id |
 | quickdraw_matches_event_id_fkey | FOREIGN KEY | FOREIGN KEY (event_id) REFERENCES events(id) |
@@ -89,6 +89,7 @@ erDiagram
   text venue_name
   integer next_pdn_code
   timestamp_with_time_zone created_at
+  boolean accepting_delayed_scores
 }
 "public.teams" {
   uuid id

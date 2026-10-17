@@ -9,11 +9,13 @@
 | venue_name | text |  | true |  |  |  |
 | next_pdn_code | integer | 1 | false |  |  |  |
 | created_at | timestamp with time zone |  | false |  |  |  |
+| accepting_delayed_scores | boolean | true | false |  |  | Reversible per-event switch, default true. When false, new matches from closed scoring periods are recorded as delayed_scores_disabled. Open-period scoring and previously accepted results are unchanged. |
 
 ## Constraints
 
 | Name | Type | Definition |
 | ---- | ---- | ---------- |
+| events_accepting_delayed_scores_not_null | n | NOT NULL accepting_delayed_scores |
 | events_created_at_not_null | n | NOT NULL created_at |
 | events_id_not_null | n | NOT NULL id |
 | events_name_not_null | n | NOT NULL name |
@@ -44,6 +46,7 @@ erDiagram
   text venue_name
   integer next_pdn_code
   timestamp_with_time_zone created_at
+  boolean accepting_delayed_scores
 }
 "public.players" {
   uuid id
