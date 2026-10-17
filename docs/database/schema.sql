@@ -34,17 +34,6 @@ COMMENT ON TYPE public.event_uuid_range IS 'Singleton event UUID ranges let the 
 
 
 --
--- Name: player_role; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.player_role AS ENUM (
-    'staff',
-    'courier',
-    'miniboss'
-);
-
-
---
 -- Name: quickdraw_scoring_status; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -60,6 +49,45 @@ CREATE TYPE public.quickdraw_scoring_status AS ENUM (
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: affiliation_categories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.affiliation_categories (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    event_id uuid NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT affiliation_categories_name_check CHECK (((name <> ''::text) AND (name = btrim(name)) AND (char_length(name) <= 256)))
+);
+
+
+--
+-- Name: TABLE affiliation_categories; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.affiliation_categories IS 'Operator-defined affiliation categories within an event. No seeded categories or implied gameplay behavior.';
+
+
+--
+-- Name: affiliations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.affiliations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    event_id uuid NOT NULL,
+    category_id uuid NOT NULL,
+    name text NOT NULL,
+    CONSTRAINT affiliations_name_check CHECK (((name <> ''::text) AND (name = btrim(name)) AND (char_length(name) <= 256)))
+);
+
+
+--
+-- Name: TABLE affiliations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.affiliations IS 'Operator-defined affiliations within a category. Names have no implicit gameplay or permission behavior.';
+
 
 --
 -- Name: app_state; Type: TABLE; Schema: public; Owner: -
@@ -153,13 +181,22 @@ COMMENT ON COLUMN public.events.accepting_delayed_scores IS 'Reversible per-even
 
 
 --
--- Name: player_roles; Type: TABLE; Schema: public; Owner: -
+-- Name: player_affiliations; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.player_roles (
+CREATE TABLE public.player_affiliations (
+    event_id uuid NOT NULL,
     player_id uuid NOT NULL,
-    role public.player_role NOT NULL
+    category_id uuid NOT NULL,
+    affiliation_id uuid NOT NULL
 );
+
+
+--
+-- Name: TABLE player_affiliations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.player_affiliations IS 'At most one affiliation per player per category. Composite foreign keys keep player, category, and affiliation in the same event. Clearing an assignment deletes its row; changes do not affect scores.';
 
 
 --
@@ -312,6 +349,54 @@ CREATE TABLE public.teams (
 
 
 --
+-- Name: affiliation_categories affiliation_categories_event_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affiliation_categories
+    ADD CONSTRAINT affiliation_categories_event_id_key UNIQUE (event_id, id);
+
+
+--
+-- Name: affiliation_categories affiliation_categories_event_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affiliation_categories
+    ADD CONSTRAINT affiliation_categories_event_name_key UNIQUE (event_id, name);
+
+
+--
+-- Name: affiliation_categories affiliation_categories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affiliation_categories
+    ADD CONSTRAINT affiliation_categories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: affiliations affiliations_category_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affiliations
+    ADD CONSTRAINT affiliations_category_name_key UNIQUE (category_id, name);
+
+
+--
+-- Name: affiliations affiliations_event_category_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affiliations
+    ADD CONSTRAINT affiliations_event_category_id_key UNIQUE (event_id, category_id, id);
+
+
+--
+-- Name: affiliations affiliations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affiliations
+    ADD CONSTRAINT affiliations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: app_state app_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -360,11 +445,11 @@ ALTER TABLE ONLY public.events
 
 
 --
--- Name: player_roles player_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: player_affiliations player_affiliations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.player_roles
-    ADD CONSTRAINT player_roles_pkey PRIMARY KEY (player_id, role);
+ALTER TABLE ONLY public.player_affiliations
+    ADD CONSTRAINT player_affiliations_pkey PRIMARY KEY (player_id, category_id);
 
 
 --
@@ -447,6 +532,13 @@ CREATE INDEX event_scoring_periods_event_id_idx ON public.event_scoring_periods 
 
 
 --
+-- Name: player_affiliations_affiliation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX player_affiliations_affiliation_idx ON public.player_affiliations USING btree (event_id, category_id, affiliation_id);
+
+
+--
 -- Name: players_event_created_at_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -475,6 +567,22 @@ CREATE INDEX quickdraw_matches_player_b_history_idx ON public.quickdraw_matches 
 
 
 --
+-- Name: affiliation_categories affiliation_categories_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affiliation_categories
+    ADD CONSTRAINT affiliation_categories_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id);
+
+
+--
+-- Name: affiliations affiliations_category_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affiliations
+    ADD CONSTRAINT affiliations_category_fkey FOREIGN KEY (event_id, category_id) REFERENCES public.affiliation_categories(event_id, id);
+
+
+--
 -- Name: app_state app_state_active_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -491,11 +599,19 @@ ALTER TABLE ONLY public.event_scoring_periods
 
 
 --
--- Name: player_roles player_roles_player_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: player_affiliations player_affiliations_affiliation_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.player_roles
-    ADD CONSTRAINT player_roles_player_id_fkey FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.player_affiliations
+    ADD CONSTRAINT player_affiliations_affiliation_fkey FOREIGN KEY (event_id, category_id, affiliation_id) REFERENCES public.affiliations(event_id, category_id, id);
+
+
+--
+-- Name: player_affiliations player_affiliations_player_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.player_affiliations
+    ADD CONSTRAINT player_affiliations_player_fkey FOREIGN KEY (event_id, player_id) REFERENCES public.players(event_id, id);
 
 
 --

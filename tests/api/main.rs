@@ -1,3 +1,4 @@
+mod affiliations;
 mod database_errors;
 mod database_timeouts;
 mod device_logs;

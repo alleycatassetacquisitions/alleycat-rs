@@ -4,12 +4,12 @@
 
 | Name | Type | Default | Nullable | Children | Parents | Comment |
 | ---- | ---- | ------- | -------- | -------- | ------- | ------- |
-| id | uuid |  | false | [public.player_roles](public.player_roles.md) [public.quickdraw_matches](public.quickdraw_matches.md) |  |  |
+| id | uuid |  | false | [public.quickdraw_matches](public.quickdraw_matches.md) [public.player_affiliations](public.player_affiliations.md) |  |  |
 | pdn_code | text |  | false |  |  |  |
 | name | text |  | false |  |  |  |
 | email | text |  | true |  |  |  |
 | created_at | timestamp with time zone |  | false |  |  |  |
-| event_id | uuid |  | false | [public.quickdraw_matches](public.quickdraw_matches.md) | [public.events](public.events.md) [public.teams](public.teams.md) |  |
+| event_id | uuid |  | false | [public.quickdraw_matches](public.quickdraw_matches.md) [public.player_affiliations](public.player_affiliations.md) | [public.events](public.events.md) [public.teams](public.teams.md) |  |
 | team_id | uuid |  | true |  | [public.teams](public.teams.md) |  |
 | active | boolean | true | false |  |  | Reversible registration/device status, initially true. Inactive players retain their PIN, name, event, and match history and remain discoverable. This flag does not change accepted scores or reject delayed match uploads. |
 
@@ -46,9 +46,9 @@
 ```mermaid
 erDiagram
 
-"public.player_roles" }o--|| "public.players" : "FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE"
 "public.quickdraw_matches" }o--|| "public.players" : "FOREIGN KEY (event_id, player_a_id) REFERENCES players(event_id, id)"
 "public.quickdraw_matches" }o--|| "public.players" : "FOREIGN KEY (event_id, player_b_id) REFERENCES players(event_id, id)"
+"public.player_affiliations" }o--|| "public.players" : "FOREIGN KEY (event_id, player_id) REFERENCES players(event_id, id)"
 "public.players" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 "public.players" }o--|| "public.teams" : "FOREIGN KEY (event_id, team_id) REFERENCES teams(event_id, id)"
 
@@ -61,10 +61,6 @@ erDiagram
   uuid event_id FK
   uuid team_id FK
   boolean active
-}
-"public.player_roles" {
-  uuid player_id FK
-  player_role role
 }
 "public.quickdraw_matches" {
   uuid id
@@ -79,6 +75,12 @@ erDiagram
   timestamp_with_time_zone occurred_at
   timestamp_with_time_zone received_at
   quickdraw_scoring_status scoring_status
+}
+"public.player_affiliations" {
+  uuid event_id FK
+  uuid player_id FK
+  uuid category_id FK
+  uuid affiliation_id FK
 }
 "public.events" {
   uuid id

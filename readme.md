@@ -56,7 +56,9 @@ scripts/seed_db.sh
 
 The seed creates a development event and selects it only if no event is active.
 It adds Hunter and Bounty teams with stable UUIDs; reseeding preserves their
-names and existing player memberships.
+names and existing player memberships. It also adds Allegiance and Faction
+choices for that development event, preserving renamed choices and existing
+affiliation assignments when rerun.
 
 ## API documentation
 
