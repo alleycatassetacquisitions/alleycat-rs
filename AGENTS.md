@@ -1,5 +1,10 @@
 # Repository guidance
 
+## Implementation choices
+
+- Prefer the simplest solution that preserves correctness. Check built-in
+  capabilities before adding dependencies, custom logic, or infrastructure costs.
+
 ## Testing shared abstractions
 
 - Test shared behavior at the abstraction boundary rather than repeating the

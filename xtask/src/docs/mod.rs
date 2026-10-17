@@ -157,6 +157,9 @@ fn generate(output: PathBuf, check: bool, check_reset: bool) -> Result<()> {
     if migrations.is_empty() {
         bail!("no SQL migrations found");
     }
+    // Match the dev database: migrations may create objects in public, but
+    // cannot install trusted extensions using database-level CREATE privileges.
+    db.sql("docs", b"CREATE ROLE app_migrator NOLOGIN")?;
     db.migrate("docs", &migrations)?;
     let schema = db.dump("docs", true)?;
     if check_reset {
@@ -250,12 +253,18 @@ impl Database {
     }
 
     fn migrate(&self, database: &str, migrations: &[PathBuf]) -> Result<()> {
+        self.sql(
+            database,
+            b"GRANT USAGE, CREATE ON SCHEMA public TO app_migrator",
+        )?;
         for migration in migrations {
             println!(
                 "Applying {} to {database}",
                 migration.file_name().unwrap().to_string_lossy()
             );
-            self.sql(database, &fs::read(migration)?)
+            let mut sql = b"SET ROLE app_migrator;\n".to_vec();
+            sql.extend(fs::read(migration)?);
+            self.sql(database, &sql)
                 .with_context(|| format!("failed to apply {}", migration.display()))?;
         }
         Ok(())
@@ -274,6 +283,10 @@ impl Database {
         // Never accept a URL or read application/cloud database configuration here.
         self.sql("docs", b"CREATE DATABASE reset_check")?;
         self.sql("reset_check", include_bytes!("reset_sentinels.sql"))?;
+        self.sql(
+            "reset_check",
+            b"GRANT USAGE, CREATE ON SCHEMA public TO app_migrator",
+        )?;
         // Full dump includes unrelated data, sequence values, ownership and grants,
         // as well as every schema object. No handwritten application inventory.
         let baseline = self.dump("reset_check", false)?;

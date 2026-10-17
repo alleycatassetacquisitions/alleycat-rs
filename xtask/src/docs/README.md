@@ -25,6 +25,9 @@ that database's network namespace. Docker downloads its image on first use; no
 local tbls installation is needed. [`.tbls.yml`](../../../.tbls.yml) controls
 presentation using upstream templates. The runner supplies the disposable database
 DSN explicitly and never uses application database settings or `REMOTE_DB_URL`.
+Migrations run as a role with `USAGE` and `CREATE` on the `public` schema, but
+without superuser or database-level `CREATE` privileges. This also checks that
+fresh installation works with the restricted App Platform dev database role.
 
 ## Generated output
 

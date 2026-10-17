@@ -24,14 +24,15 @@ Event scoring history. Opening creates a row; closing fills closes_at. Match eli
 | event_scoring_periods_time_order | CHECK | CHECK ((closes_at > started_at)) |
 | event_scoring_periods_event_id_fkey | FOREIGN KEY | FOREIGN KEY (event_id) REFERENCES events(id) |
 | event_scoring_periods_pkey | PRIMARY KEY | PRIMARY KEY (id) |
-| event_scoring_periods_no_overlap | x | EXCLUDE USING gist (event_id WITH =, tstzrange(started_at, closes_at, '[)'::text) WITH &&) |
+| event_scoring_periods_no_overlap | x | EXCLUDE USING gist (event_uuid_range(event_id, event_id, '[]'::text) WITH &&, tstzrange(started_at, closes_at, '[)'::text) WITH &&) |
 
 ## Indexes
 
 | Name | Definition |
 | ---- | ---------- |
 | event_scoring_periods_pkey | CREATE UNIQUE INDEX event_scoring_periods_pkey ON public.event_scoring_periods USING btree (id) |
-| event_scoring_periods_no_overlap | CREATE INDEX event_scoring_periods_no_overlap ON public.event_scoring_periods USING gist (event_id, tstzrange(started_at, closes_at, '[)'::text)) |
+| event_scoring_periods_no_overlap | CREATE INDEX event_scoring_periods_no_overlap ON public.event_scoring_periods USING gist (event_uuid_range(event_id, event_id, '[]'::text), tstzrange(started_at, closes_at, '[)'::text)) |
+| event_scoring_periods_event_id_idx | CREATE INDEX event_scoring_periods_event_id_idx ON public.event_scoring_periods USING btree (event_id) |
 
 ## Relations
 

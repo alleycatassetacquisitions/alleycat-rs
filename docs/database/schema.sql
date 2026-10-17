@@ -17,17 +17,20 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: btree_gist; Type: EXTENSION; Schema: -; Owner: -
+-- Name: event_uuid_range; Type: TYPE; Schema: public; Owner: -
 --
 
-CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;
+CREATE TYPE public.event_uuid_range AS RANGE (
+    subtype = uuid,
+    multirange_type_name = public.event_uuid_multirange
+);
 
 
 --
--- Name: EXTENSION btree_gist; Type: COMMENT; Schema: -; Owner: -
+-- Name: TYPE event_uuid_range; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON EXTENSION btree_gist IS 'support for indexing common datatypes in GiST';
+COMMENT ON TYPE public.event_uuid_range IS 'Singleton event UUID ranges let the scoring-period exclusion constraint compare events using core GiST range operators, without btree_gist. Construct both bounds from the same UUID with inclusive bounds.';
 
 
 --
@@ -329,7 +332,7 @@ ALTER TABLE ONLY public.device_logs
 --
 
 ALTER TABLE ONLY public.event_scoring_periods
-    ADD CONSTRAINT event_scoring_periods_no_overlap EXCLUDE USING gist (event_id WITH =, tstzrange(started_at, closes_at, '[)'::text) WITH &&);
+    ADD CONSTRAINT event_scoring_periods_no_overlap EXCLUDE USING gist (public.event_uuid_range(event_id, event_id, '[]'::text) WITH &&, tstzrange(started_at, closes_at, '[)'::text) WITH &&);
 
 
 --
@@ -426,6 +429,13 @@ ALTER TABLE ONLY public.teams
 
 ALTER TABLE ONLY public.teams
     ADD CONSTRAINT teams_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: event_scoring_periods_event_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX event_scoring_periods_event_id_idx ON public.event_scoring_periods USING btree (event_id);
 
 
 --
