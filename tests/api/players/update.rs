@@ -1,14 +1,13 @@
-use crate::helpers::{TestApp, assert_text_error, spawn_app_with_event};
+use crate::helpers::{TestApp, assert_json, assert_text_error, spawn_app_with_event};
 use reqwest::Method;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 async fn register(app: &TestApp, name: &str) -> Value {
-    app.post_players(format!("name={name}&email=alex%40example.com"))
-        .await
-        .json()
-        .await
-        .unwrap()
+    let response = app
+        .post_players(format!("name={name}&email=alex%40example.com"))
+        .await;
+    assert_json(response, 200).await
 }
 
 async fn team(app: &TestApp, event: &str, name: &str) -> Value {
@@ -19,8 +18,7 @@ async fn team(app: &TestApp, event: &str, name: &str) -> Value {
             json!({"name": name}),
         )
         .await;
-    assert_eq!(response.status(), 201);
-    response.json().await.unwrap()
+    assert_json(response, 201).await
 }
 
 #[tokio::test]
@@ -39,8 +37,7 @@ async fn players_can_edit_clear_and_restore_fields_without_changing_identity() {
             json!({"name": "Alex Updated", "team_id": first_team["id"], "active": false}),
         )
         .await;
-    assert_eq!(response.status(), 200);
-    let updated: Value = response.json().await.unwrap();
+    let updated: Value = assert_json(response, 200).await;
     assert_eq!(updated["name"], "Alex Updated");
     assert_eq!(updated["email"], created["email"]);
     assert_eq!(updated["team_id"], first_team["id"]);
@@ -49,7 +46,8 @@ async fn players_can_edit_clear_and_restore_fields_without_changing_identity() {
     for field in ["id", "event_id", "pdn_code", "created_at"] {
         assert_eq!(updated[field], created[field]);
     }
-    let roster: Value = app.get_players().await.json().await.unwrap();
+    let response = app.get_players().await;
+    let roster: Value = assert_json(response, 200).await;
     assert_eq!(roster["players"][0], updated);
     assert_eq!(app.get(&path).await.json::<Value>().await.unwrap(), updated);
     let replacement = app
@@ -59,8 +57,7 @@ async fn players_can_edit_clear_and_restore_fields_without_changing_identity() {
             json!({"team_id": second_team["id"], "email": "new@example.com"}),
         )
         .await;
-    assert_eq!(replacement.status(), 200);
-    let replacement: Value = replacement.json().await.unwrap();
+    let replacement: Value = assert_json(replacement, 200).await;
     assert_eq!(replacement["team_name"], "Couriers");
     assert_eq!(replacement["email"], "new@example.com");
     assert_eq!(replacement["active"], false);
@@ -71,8 +68,7 @@ async fn players_can_edit_clear_and_restore_fields_without_changing_identity() {
             json!({"email": null, "team_id": null, "active": true}),
         )
         .await;
-    assert_eq!(response.status(), 200);
-    let cleared: Value = response.json().await.unwrap();
+    let cleared: Value = assert_json(response, 200).await;
     assert_eq!(cleared["email"], Value::Null);
     assert_eq!(cleared["team_id"], Value::Null);
     assert_eq!(cleared["team_name"], Value::Null);
@@ -173,17 +169,14 @@ async fn concurrent_partial_edits_preserve_each_others_fields_and_inactive_ident
     );
     assert_eq!(name.status(), 200);
     assert_eq!(email.status(), 200);
-    let updated: Value = app.get(&path).await.json().await.unwrap();
+    let response = app.get(&path).await;
+    let updated: Value = assert_json(response, 200).await;
     assert_eq!(updated["name"], "Renamed");
     assert_eq!(updated["email"], "new@example.com");
     assert_eq!(updated["active"], false);
     assert_eq!(app.post_players("name=Renamed".into()).await.status(), 409);
-    let next: Value = app
-        .post_players("name=Next".into())
-        .await
-        .json()
-        .await
-        .unwrap();
+    let response = app.post_players("name=Next".into()).await;
+    let next: Value = assert_json(response, 200).await;
     assert_ne!(next["pdn_code"], created["pdn_code"]);
 }
 

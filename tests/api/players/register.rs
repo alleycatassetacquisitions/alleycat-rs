@@ -1,4 +1,4 @@
-use crate::helpers::{spawn_app, spawn_app_with_event};
+use crate::helpers::{assert_json, spawn_app, spawn_app_with_event};
 
 async fn assert_registration_conflict(response: reqwest::Response, message: &str) {
     assert_eq!(response.status(), 409);
@@ -12,9 +12,7 @@ async fn register_player_returns_a_200_for_valid_form_data() {
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = app.post_players(body.into()).await;
 
-    assert_eq!(200, response.status().as_u16());
-    assert_eq!(response.headers()["content-type"], "application/json");
-    let created: serde_json::Value = response.json().await.unwrap();
+    let created: serde_json::Value = assert_json(response, 200).await;
     let saved = sqlx::query!("SELECT name, email, pdn_code FROM players",)
         .fetch_one(&app.db_pool)
         .await
@@ -33,7 +31,8 @@ async fn register_player_returns_a_200_for_valid_form_data() {
     assert!(created["created_at"].is_string());
     assert_eq!(created.get("team_id"), Some(&serde_json::Value::Null));
     assert_eq!(created.get("team_name"), Some(&serde_json::Value::Null));
-    let roster: serde_json::Value = app.get_players().await.json().await.unwrap();
+    let response = app.get_players().await;
+    let roster: serde_json::Value = assert_json(response, 200).await;
     assert_eq!(roster["players"][0], created);
 }
 

@@ -2,18 +2,15 @@ use crate::helpers::{assert_json, spawn_app, spawn_app_with_event};
 use alleycat_rs::proto::alleycat::device::DevicePlayerResponse;
 use prost::Message;
 use reqwest::Method;
-use reqwest::header::CONTENT_TYPE;
 use serde_json::{Value, json};
 
 #[tokio::test]
 async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_email() {
     let app = spawn_app_with_event().await;
-    let first: Value = app
+    let response = app
         .post_players("name=Alex&email=private-address%40example.com".into())
-        .await
-        .json()
-        .await
-        .unwrap();
+        .await;
+    let first: Value = assert_json(response, 200).await;
     let pin = first["pdn_code"].as_str().unwrap();
     assert_eq!(pin, "0001");
     let id_path = format!("/players/{}", first["id"].as_str().unwrap());
@@ -21,8 +18,8 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
     let device_path = format!("/device/players/by-pin/{pin}");
     for path in [&id_path, &pin_path] {
         let response = app.get(path).await;
-        assert_eq!(response.status(), 200);
-        assert_eq!(response.json::<Value>().await.unwrap(), first);
+        let player: Value = assert_json(response, 200).await;
+        assert_eq!(player, first);
     }
     let response = app.get(&device_path).await;
     assert_eq!(response.status(), 200);
@@ -52,8 +49,7 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
             json!({"name": "Runners"}),
         )
         .await;
-    assert_eq!(team_response.status(), 201);
-    let team: Value = team_response.json().await.unwrap();
+    let team: Value = assert_json(team_response, 201).await;
     assert_eq!(
         app.request_json(
             Method::PATCH,
@@ -83,17 +79,14 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
     assert_eq!(device.team_id.as_deref(), team["id"].as_str());
     assert_eq!(device.team_name.as_deref(), Some("Renamed team"));
     assert!(!device.active);
-    let by_pin: Value = app.get(&pin_path).await.json().await.unwrap();
+    let response = app.get(&pin_path).await;
+    let by_pin: Value = assert_json(response, 200).await;
     assert_eq!(by_pin["team_name"], "Renamed team");
     assert_eq!(by_pin["email"], first["email"]);
 
     app.activate_new_event().await;
-    let second: Value = app
-        .post_players("name=Second".into())
-        .await
-        .json()
-        .await
-        .unwrap();
+    let response = app.post_players("name=Second".into()).await;
+    let second: Value = assert_json(response, 200).await;
     assert_eq!(second["pdn_code"], pin);
     assert_eq!(app.get(&id_path).await.status(), 404);
     assert_eq!(
@@ -150,10 +143,12 @@ async fn listing_is_scoped_to_active_event_and_names_and_codes_can_be_reused() {
     let app = spawn_app_with_event().await;
     assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
     let event_id = app.activate_new_event().await;
-    let empty: Value = app.get_players().await.json().await.unwrap();
+    let response = app.get_players().await;
+    let empty: Value = assert_json(response, 200).await;
     assert_eq!(empty["players"].as_array().unwrap().len(), 0);
     assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
-    let body: Value = app.get_players().await.json().await.unwrap();
+    let response = app.get_players().await;
+    let body: Value = assert_json(response, 200).await;
     assert_eq!(body["players"].as_array().unwrap().len(), 1);
     assert_eq!(body["players"][0]["pdn_code"], "0001");
     let saved_event: uuid::Uuid = sqlx::query_scalar("SELECT event_id FROM players WHERE id = $1")
@@ -166,7 +161,8 @@ async fn listing_is_scoped_to_active_event_and_names_and_codes_can_be_reused() {
         .execute(&app.db_pool)
         .await
         .unwrap();
-    let empty: Value = app.get_players().await.json().await.unwrap();
+    let response = app.get_players().await;
+    let empty: Value = assert_json(response, 200).await;
     assert_eq!(empty["players"].as_array().unwrap().len(), 0);
 }
 

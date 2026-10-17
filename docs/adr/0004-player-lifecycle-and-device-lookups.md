@@ -5,47 +5,59 @@
 
 ## Context
 
-Registration operators need to correct player details, change teams, and mark
-registrations inactive without deleting participants referenced by match history.
-Devices need PIN lookup data without receiving the email used at registration.
-PINs are unique only within an event and can be reused in other events.
+Operators need to fix player details, move players between teams, and mark a
+player inactive. Deleting a player would cause problems for matches they've
+already played, so we need a way to keep that history intact.
+
+Devices also need to find players by PIN, but they don't need the email address
+used at registration. Since two events can assign the same PIN, a lookup needs
+to know which event we're running.
 
 ## Decision
 
-Keep the player UUID, event, assigned PIN, and creation time immutable. Permit
-updates to name, email, current team, and an active/inactive flag. Nullable
-email and membership may be cleared. Team membership stays within the event.
-Changes apply only to registrations in the active event; updates hold the active
-selection lock until commit so an event switch cannot redirect an edit.
+Operators can change a player's name, email, team, and active status. They can
+also clear an email address or remove a player from a team. A player can only
+join teams in their own event. Their UUID, event, assigned PIN, and registration
+time stay fixed so edits don't change which registration we're referring to.
 
-Deactivation is reversible status, not deletion or a scoring decision. Inactive
-players remain listed and discoverable, retain their names and PINs, and can be
-reactivated. Device responses expose the flag for clients to honor. Neither
-deactivation nor changing teams rewrites match snapshots or rejects previously
-completed matches uploaded later. This flag alone does not prove whether a
-player was active at match time; ingestion continues to trust device reports.
+Edits apply to players in the active event. While saving an edit, we lock the
+active event selection so switching events can't redirect an edit already in
+progress.
 
-Staff JSON responses include all registration fields and the current team's
-name. Device lookup has a separate protobuf response with no email field and
-queries only device-visible data. Both UUID and PIN lookups use the active event.
-Devices receive the event UUID alongside the PIN so match uploads can retain
-their original event even after the active selection changes.
+An inactive player keeps their name and PIN, still appears in lookups and lists,
+and can be reactivated. Devices receive that status so they can act on it.
+Changing status or teams doesn't rewrite past matches or reject completed
+matches that arrive later. Today's status can't tell us whether someone was
+active when a match happened, so we continue to trust the device's match report.
+
+The JSON responses used by registration staff include the player's full details
+and current team name. Devices get a separate protobuf message with no email
+field; that lookup doesn't even read email from the database.
+
+Both UUID and PIN lookups use the active event. The device response includes the
+event UUID so a device can save it with a match and upload to the correct event
+later, even if the server has since switched events.
 
 ## Alternatives considered
 
-- Hard deletion would break participant references or require erasing history.
-- Using current membership/status to invalidate historical matches cannot account
-  for delayed device uploads and would change previously earned credit.
-- Global PIN lookup would be ambiguous across events.
-- Sharing the staff response with devices would unnecessarily disclose email and
-  make future response changes easier to expose accidentally.
+- Deleting players would leave matches referring to missing participants or
+  require us to erase their history too.
+- Using a player's current team or status to decide whether an old match counts
+  would mishandle delayed uploads and could change points already earned.
+- Looking up a PIN across all events could return more than one player.
+- Sending devices the staff response would give them email addresses they don't
+  need. A separate message also keeps future staff-only fields out of device
+  responses unless we deliberately add them.
 
 ## Consequences
 
-Inactive registrations continue to consume a PIN and reserve their name in that
-event. Staff can correct or reactivate the original record. Enforcing eligibility
-at match time would require a separate policy and temporal status information.
-Corp/faction and role categories remain a separate design task.
+Inactive players still use a PIN and reserve their name in that event. Staff can
+correct or reactivate the existing registration instead of creating another one.
+
+If we later want the server to enforce whether a player was allowed to play at
+match time, we'll need rules for that and a history of status changes. The
+active flag alone isn't enough. Corp/faction and role categories are also left
+for a separate design discussion.
 
 ## References
 
