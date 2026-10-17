@@ -32,4 +32,4 @@ else
         < "${SEED_FILE}"
 fi
 
-echo "Seeded sample players and device logs."
+echo "Seeded the development event, teams, affiliation choices, players, and device logs."

@@ -43,3 +43,4 @@ context and rationale; typo fixes, clarifications, and repaired links are fine.
 | [0003: Reversible delayed scoring](0003-reversible-delayed-scoring.md) | Accepted | 2026-10-15 |
 | [0004: Player lifecycle and device lookups](0004-player-lifecycle-and-device-lookups.md) | Accepted | 2026-10-15 |
 | [0005: Extension-free scoring-period constraints](0005-extension-free-scoring-periods.md) | Accepted | 2026-10-16 |
+| [0006: Event affiliations](0006-event-affiliations.md) | Accepted | 2026-10-17 |

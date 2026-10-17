@@ -14,7 +14,6 @@ do not edit these files manually.
 | Name | Columns | Comment | Type |
 | ---- | ------- | ------- | ---- |
 | [public.players](public.players.md) | 8 |  | BASE TABLE |
-| [public.player_roles](public.player_roles.md) | 2 |  | BASE TABLE |
 | [public.device_logs](public.device_logs.md) | 10 |  | BASE TABLE |
 | [public.events](public.events.md) | 6 |  | BASE TABLE |
 | [public.reserved_pdn_codes](public.reserved_pdn_codes.md) | 2 |  | BASE TABLE |
@@ -22,6 +21,9 @@ do not edit these files manually.
 | [public.teams](public.teams.md) | 3 |  | BASE TABLE |
 | [public.event_scoring_periods](public.event_scoring_periods.md) | 4 | Event scoring history. Opening creates a row; closing fills closes_at. Match eligibility uses device occurrence time, not upload time. No unclosed period means scoring is disabled. | BASE TABLE |
 | [public.quickdraw_matches](public.quickdraw_matches.md) | 12 | Completed two-player quickdraw results, including non-scoring duels. Ingestion must use INSERT ... ON CONFLICT (id) DO NOTHING: the first accepted report and its device timestamp win. No per-device reports or leaderboard totals are stored. | BASE TABLE |
+| [public.affiliation_categories](public.affiliation_categories.md) | 3 | Operator-defined affiliation categories within an event. No seeded categories or implied gameplay behavior. | BASE TABLE |
+| [public.affiliations](public.affiliations.md) | 4 | Operator-defined affiliations within a category. Names have no implicit gameplay or permission behavior. | BASE TABLE |
+| [public.player_affiliations](public.player_affiliations.md) | 4 | At most one affiliation per player per category. Composite foreign keys keep player, category, and affiliation in the same event. Clearing an assignment deletes its row; changes do not affect scores. | BASE TABLE |
 
 ## Stored procedures and functions
 
@@ -37,7 +39,6 @@ do not edit these files manually.
 
 | Name | Values |
 | ---- | ------- |
-| public.player_role | courier, miniboss, staff |
 | public.quickdraw_scoring_status | delayed_scores_disabled, same_team, scoring, scoring_disabled, unassigned_team |
 
 ## Relations
@@ -47,7 +48,6 @@ erDiagram
 
 "public.players" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 "public.players" }o--|| "public.teams" : "FOREIGN KEY (event_id, team_id) REFERENCES teams(event_id, id)"
-"public.player_roles" }o--|| "public.players" : "FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE"
 "public.app_state" }o--o| "public.events" : "FOREIGN KEY (active_event_id) REFERENCES events(id)"
 "public.teams" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 "public.event_scoring_periods" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
@@ -56,6 +56,10 @@ erDiagram
 "public.quickdraw_matches" }o--|| "public.teams" : "FOREIGN KEY (event_id, player_b_team_id) REFERENCES teams(event_id, id)"
 "public.quickdraw_matches" }o--|| "public.players" : "FOREIGN KEY (event_id, player_a_id) REFERENCES players(event_id, id)"
 "public.quickdraw_matches" }o--|| "public.players" : "FOREIGN KEY (event_id, player_b_id) REFERENCES players(event_id, id)"
+"public.affiliation_categories" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
+"public.affiliations" }o--|| "public.affiliation_categories" : "FOREIGN KEY (event_id, category_id) REFERENCES affiliation_categories(event_id, id)"
+"public.player_affiliations" }o--|| "public.players" : "FOREIGN KEY (event_id, player_id) REFERENCES players(event_id, id)"
+"public.player_affiliations" }o--|| "public.affiliations" : "FOREIGN KEY (event_id, category_id, affiliation_id) REFERENCES affiliations(event_id, category_id, id)"
 
 "public.players" {
   uuid id
@@ -66,10 +70,6 @@ erDiagram
   uuid event_id FK
   uuid team_id FK
   boolean active
-}
-"public.player_roles" {
-  uuid player_id FK
-  player_role role
 }
 "public.device_logs" {
   uuid id
@@ -123,6 +123,23 @@ erDiagram
   timestamp_with_time_zone occurred_at
   timestamp_with_time_zone received_at
   quickdraw_scoring_status scoring_status
+}
+"public.affiliation_categories" {
+  uuid id
+  uuid event_id FK
+  text name
+}
+"public.affiliations" {
+  uuid id
+  uuid event_id FK
+  uuid category_id FK
+  text name
+}
+"public.player_affiliations" {
+  uuid event_id FK
+  uuid player_id FK
+  uuid category_id FK
+  uuid affiliation_id FK
 }
 ```
 

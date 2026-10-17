@@ -3,6 +3,9 @@ SET LOCAL search_path TO public;
 -- Remove application tables and SQLx's migration ledger. CASCADE removes
 -- dependent constraints and indexes.
 DROP TABLE IF EXISTS
+    player_affiliations,
+    affiliations,
+    affiliation_categories,
     quickdraw_matches,
     event_scoring_periods,
     device_logs,

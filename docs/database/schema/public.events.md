@@ -4,7 +4,7 @@
 
 | Name | Type | Default | Nullable | Children | Parents | Comment |
 | ---- | ---- | ------- | -------- | -------- | ------- | ------- |
-| id | uuid |  | false | [public.players](public.players.md) [public.app_state](public.app_state.md) [public.teams](public.teams.md) [public.event_scoring_periods](public.event_scoring_periods.md) [public.quickdraw_matches](public.quickdraw_matches.md) |  |  |
+| id | uuid |  | false | [public.players](public.players.md) [public.app_state](public.app_state.md) [public.teams](public.teams.md) [public.event_scoring_periods](public.event_scoring_periods.md) [public.quickdraw_matches](public.quickdraw_matches.md) [public.affiliation_categories](public.affiliation_categories.md) |  |  |
 | name | text |  | false |  |  |  |
 | venue_name | text |  | true |  |  |  |
 | next_pdn_code | integer | 1 | false |  |  |  |
@@ -39,6 +39,7 @@ erDiagram
 "public.teams" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 "public.event_scoring_periods" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 "public.quickdraw_matches" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
+"public.affiliation_categories" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 
 "public.events" {
   uuid id
@@ -86,6 +87,11 @@ erDiagram
   timestamp_with_time_zone occurred_at
   timestamp_with_time_zone received_at
   quickdraw_scoring_status scoring_status
+}
+"public.affiliation_categories" {
+  uuid id
+  uuid event_id FK
+  text name
 }
 ```
 
