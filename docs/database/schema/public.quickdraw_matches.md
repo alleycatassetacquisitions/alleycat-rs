@@ -104,6 +104,7 @@ erDiagram
   timestamp_with_time_zone created_at
   uuid event_id FK
   uuid team_id FK
+  boolean active
 }
 ```
 

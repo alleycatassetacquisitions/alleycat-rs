@@ -31,7 +31,8 @@ async fn unexpected_constraints_are_not_reported_as_name_conflicts_or_exposed() 
         500,
     )
     .await;
-    let player_error = assert_text_error(app.post_players("name=Rejected".into()).await, 500).await;
+    let player_error =
+        assert_text_error(app.post_players(json!({"name": "Rejected"})).await, 500).await;
     // Assert against private fixture details, not the public message's wording.
     for body in [team_error, player_error] {
         for private_detail in [
@@ -68,8 +69,7 @@ async fn representative_routes_return_safe_text_on_database_failure() {
             .set_json(json!({"name": "Game"})),
         test::TestRequest::post()
             .uri("/players")
-            .insert_header((CONTENT_TYPE, "application/x-www-form-urlencoded"))
-            .set_payload("name=Nyx"),
+            .set_json(json!({"name": "Nyx"})),
     ] {
         let response = test::call_service(&app, request.to_request()).await;
         assert_eq!(response.status(), 500);

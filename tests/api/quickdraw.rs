@@ -158,6 +158,55 @@ async fn delayed_matches_use_period_boundaries_and_device_team_snapshots() {
 }
 
 #[tokio::test]
+async fn player_team_edits_and_deactivation_preserve_history_and_delayed_uploads() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let start = 1_790_000_000_000;
+    game.period(&app, start, Some(start + 1000)).await;
+    assert_eq!(
+        game.upload(&app, vec![game.report(1, start)])
+            .await
+            .status(),
+        204
+    );
+    let original = game.list(&app).await;
+    assert_eq!(
+        app.request_json(
+            Method::PUT,
+            &format!("/events/{}/active", game.event),
+            json!(null)
+        )
+        .await
+        .status(),
+        204
+    );
+    assert_eq!(
+        app.request_json(
+            Method::PATCH,
+            &format!("/players/{}", game.players[0]),
+            json!({"team_id": game.teams[1], "active": false})
+        )
+        .await
+        .status(),
+        200
+    );
+    assert_eq!(game.list(&app).await, original);
+    assert_eq!(
+        game.upload(&app, vec![game.report(1, start), game.report(2, start + 1)])
+            .await
+            .status(),
+        204
+    );
+    let matches = game.list(&app).await;
+    assert_eq!(matches["matches"].as_array().unwrap().len(), 2);
+    for row in matches["matches"].as_array().unwrap() {
+        assert_eq!(row["scoring_status"], "scoring");
+        assert_eq!(row["player_a_team_id"], game.teams[0].to_string());
+        assert_eq!(row["player_b_team_id"], game.teams[1].to_string());
+    }
+}
+
+#[tokio::test]
 async fn retries_preserve_the_first_report_including_receipt_time() {
     let app = spawn_app().await;
     let game = Game::create(&app).await;

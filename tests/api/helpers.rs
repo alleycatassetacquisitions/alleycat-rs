@@ -71,13 +71,8 @@ impl TestApp {
             .expect("Failed to execute GET request.")
     }
 
-    pub async fn post_players(&self, body: String) -> Response {
-        self.post_bytes(
-            "/players",
-            "application/x-www-form-urlencoded",
-            body.into_bytes(),
-        )
-        .await
+    pub async fn post_players(&self, body: Value) -> Response {
+        self.request_json(Method::POST, "/players", body).await
     }
 
     pub async fn get_players(&self) -> Response {

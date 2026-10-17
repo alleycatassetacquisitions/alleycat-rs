@@ -2,6 +2,32 @@ syntax = "proto3";
 
 package alleycat.device;
 
+// Response for GET /device/players/by-pin/{pin}, application/protobuf.
+// No request body. The path PIN is exactly four ASCII digits, including leading
+// zeros, and is resolved in the active event. Invalid PIN format returns 400;
+// no active event or no matching player returns 404. Errors are plain text.
+// Email is deliberately absent from this device-only response.
+message DevicePlayerResponse {
+  // Player UUID. Stable for this registration.
+  string id = 1;
+  // Event UUID. PINs are unique only within an event.
+  string event_id = 2;
+  // Four-digit PIN; preserve leading zeros.
+  string pdn_code = 3;
+  // Current player display name.
+  string name = 4;
+  // Registration creation time in UTC milliseconds since 1970-01-01.
+  int64 created_at_unix_ms = 5;
+  // Current team UUID, absent when unassigned. Not a match-time snapshot.
+  optional string team_id = 6;
+  // Current team name, absent when unassigned.
+  optional string team_name = 7;
+  // True for active registrations. Inactive players remain discoverable with
+  // false; clients should honor this status. It does not rewrite match scores
+  // or prevent uploads of previously completed matches.
+  bool active = 8;
+}
+
 // Request body for POST /device-logs.
 //
 // The server generates:

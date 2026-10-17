@@ -184,6 +184,10 @@
             <ul>
               
                 <li>
+                  <a href="#alleycat.device.DevicePlayerResponse"><span class="badge">M</span>DevicePlayerResponse</a>
+                </li>
+              
+                <li>
                   <a href="#alleycat.device.QuickdrawMatch"><span class="badge">M</span>QuickdrawMatch</a>
                 </li>
               
@@ -212,6 +216,81 @@
       </div>
       <p></p>
 
+      
+        <h3 id="alleycat.device.DevicePlayerResponse">DevicePlayerResponse</h3>
+        <p>Response for GET /device/players/by-pin/{pin}, application/protobuf.</p><p>No request body. The path PIN is exactly four ASCII digits, including leading</p><p>zeros, and is resolved in the active event. Invalid PIN format returns 400;</p><p>no active event or no matching player returns 404. Errors are plain text.</p><p>Email is deliberately absent from this device-only response.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Player UUID. Stable for this registration. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>event_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Event UUID. PINs are unique only within an event. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>pdn_code</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Four-digit PIN; preserve leading zeros. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Current player display name. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>created_at_unix_ms</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>Registration creation time in UTC milliseconds since 1970-01-01. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>team_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>Current team UUID, absent when unassigned. Not a match-time snapshot. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>team_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>Current team name, absent when unassigned. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>active</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>True for active registrations. Inactive players remain discoverable with
+false; clients should honor this status. It does not rewrite match scores
+or prevent uploads of previously completed matches. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
       
         <h3 id="alleycat.device.QuickdrawMatch">QuickdrawMatch</h3>
         <p></p>

@@ -174,8 +174,16 @@ CREATE TABLE public.players (
     created_at timestamp with time zone NOT NULL,
     event_id uuid NOT NULL,
     team_id uuid,
+    active boolean DEFAULT true NOT NULL,
     CONSTRAINT players_pdn_code_check CHECK ((pdn_code ~ '^[0-9]{4}$'::text))
 );
+
+
+--
+-- Name: COLUMN players.active; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.players.active IS 'Reversible registration/device status, initially true. Inactive players retain their PIN, name, event, and match history and remain discoverable. This flag does not change accepted scores or reject delayed match uploads.';
 
 
 --
