@@ -1,20 +1,18 @@
-use crate::helpers::{assert_text_error, spawn_app};
+use crate::helpers::{assert_json, assert_text_error, spawn_app};
 use chrono::{DateTime, Utc};
 use reqwest::Method;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 #[tokio::test]
-async fn game_state_tracks_the_active_event_and_its_independent_settings() {
+async fn game_state_without_an_active_event_returns_null_settings_and_utc_time() {
     let app = spawn_app().await;
     let before: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&app.db_pool)
         .await
         .unwrap();
     let response = app.get("/game-state").await;
-    assert_eq!(response.status(), 200);
-    assert_eq!(response.headers()["content-type"], "application/json");
-    let state: Value = response.json().await.unwrap();
+    let state: Value = assert_json(response, 200).await;
     let after: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&app.db_pool)
         .await
@@ -25,18 +23,23 @@ async fn game_state_tracks_the_active_event_and_its_independent_settings() {
     assert_eq!(state["active_event"], Value::Null);
     assert_eq!(state["scoring"], Value::Null);
     assert_eq!(state["accepting_delayed_scores"], Value::Null);
+}
 
+#[tokio::test]
+async fn game_state_tracks_the_active_event_and_its_independent_settings() {
+    let app = spawn_app().await;
     let first = app
         .create_event(json!({"name": "First", "venue_name": "Hall"}))
         .await;
     let id = first["id"].as_str().unwrap();
-    assert_eq!(
-        app.request_json(Method::PUT, &format!("/events/{id}/active"), json!(null))
-            .await
-            .status(),
-        204
-    );
-    let state: Value = app.get("/game-state").await.json().await.unwrap();
+    let response = app
+        .request(Method::PUT, &format!("/events/{id}/active"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 204);
+    let response = app.get("/game-state").await;
+    let state: Value = assert_json(response, 200).await;
     assert_eq!(state["active_event"], first);
     assert_eq!(
         state["scoring"],
@@ -44,33 +47,30 @@ async fn game_state_tracks_the_active_event_and_its_independent_settings() {
     );
     assert_eq!(state["accepting_delayed_scores"], true);
 
-    let scoring: Value = app
+    let response = app
         .request_json(
             Method::PUT,
             &format!("/events/{id}/scoring"),
             json!({"enabled": true}),
         )
-        .await
-        .json()
-        .await
-        .unwrap();
+        .await;
+    let scoring: Value = assert_json(response, 200).await;
     let delayed = format!("/events/{id}/delayed-scores");
     for _ in 0..2 {
         let response = app
             .request_json(Method::PUT, &delayed, json!({"enabled": false}))
             .await;
-        assert_eq!(response.status(), 200);
-        assert_eq!(
-            response.json::<Value>().await.unwrap(),
-            json!({"enabled": false})
-        );
+        let setting: Value = assert_json(response, 200).await;
+        assert_eq!(setting, json!({"enabled": false}));
     }
-    let state: Value = app.get("/game-state").await.json().await.unwrap();
+    let response = app.get("/game-state").await;
+    let state: Value = assert_json(response, 200).await;
     assert_eq!(state["scoring"], scoring);
     assert_eq!(state["accepting_delayed_scores"], false);
 
     let second = app.activate_new_event().await;
-    let state: Value = app.get("/game-state").await.json().await.unwrap();
+    let response = app.get("/game-state").await;
+    let state: Value = assert_json(response, 200).await;
     assert_eq!(state["active_event"]["id"], second.to_string());
     assert_eq!(state["scoring"]["enabled"], false);
     assert_eq!(state["accepting_delayed_scores"], true);
@@ -81,13 +81,14 @@ async fn game_state_tracks_the_active_event_and_its_independent_settings() {
             .status(),
         200
     );
-    assert_eq!(
-        app.request_json(Method::PUT, &format!("/events/{id}/active"), json!(null))
-            .await
-            .status(),
-        204
-    );
-    let state: Value = app.get("/game-state").await.json().await.unwrap();
+    let response = app
+        .request(Method::PUT, &format!("/events/{id}/active"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 204);
+    let response = app.get("/game-state").await;
+    let state: Value = assert_json(response, 200).await;
     assert_eq!(state["active_event"], first);
     assert_eq!(state["scoring"], scoring);
     assert_eq!(state["accepting_delayed_scores"], true);
@@ -119,15 +120,20 @@ async fn delayed_score_settings_validate_requests_and_missing_events() {
         404,
     )
     .await;
-    let state: Value = app.get("/game-state").await.json().await.unwrap();
+    let response = app.get("/game-state").await;
+    let state: Value = assert_json(response, 200).await;
     assert_eq!(state["accepting_delayed_scores"], true);
+}
+
+#[tokio::test]
+async fn game_state_without_the_selection_row_still_returns_server_time() {
+    let app = spawn_app().await;
     sqlx::query("DELETE FROM app_state")
         .execute(&app.db_pool)
         .await
         .unwrap();
     let response = app.get("/game-state").await;
-    assert_eq!(response.status(), 200);
-    let state: Value = response.json().await.unwrap();
+    let state: Value = assert_json(response, 200).await;
     assert_eq!(state["active_event"], Value::Null);
     assert_eq!(state["scoring"], Value::Null);
     assert_eq!(state["accepting_delayed_scores"], Value::Null);
