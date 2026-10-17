@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 async fn register(app: &TestApp, name: &str) -> Value {
     let response = app
-        .post_players(format!("name={name}&email=alex%40example.com"))
+        .post_players(json!({"name": name, "email": "alex@example.com"}))
         .await;
     assert_json(response, 200).await
 }
@@ -174,8 +174,11 @@ async fn concurrent_partial_edits_preserve_each_others_fields_and_inactive_ident
     assert_eq!(updated["name"], "Renamed");
     assert_eq!(updated["email"], "new@example.com");
     assert_eq!(updated["active"], false);
-    assert_eq!(app.post_players("name=Renamed".into()).await.status(), 409);
-    let response = app.post_players("name=Next".into()).await;
+    assert_eq!(
+        app.post_players(json!({"name": "Renamed"})).await.status(),
+        409
+    );
+    let response = app.post_players(json!({"name": "Next"})).await;
     let next: Value = assert_json(response, 200).await;
     assert_ne!(next["pdn_code"], created["pdn_code"]);
 }

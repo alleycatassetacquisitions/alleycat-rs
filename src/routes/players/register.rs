@@ -9,7 +9,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize, utoipa::ToSchema)]
-pub struct FormData {
+pub struct RegisterPlayer {
     /// Nonblank name, at most 256 graphemes; cannot contain null characters or / ( ) \" < > \\ { }.
     #[schema(example = "Alex")]
     name: String,
@@ -18,10 +18,10 @@ pub struct FormData {
     email: Option<String>,
 }
 
-impl TryFrom<FormData> for NewPlayer {
+impl TryFrom<RegisterPlayer> for NewPlayer {
     type Error = String;
 
-    fn try_from(value: FormData) -> Result<Self, Self::Error> {
+    fn try_from(value: RegisterPlayer) -> Result<Self, Self::Error> {
         let name = PlayerName::parse(value.name)?;
         let email = value.email.map(PlayerEmail::parse).transpose()?;
         Ok(NewPlayer { email, name })
@@ -30,24 +30,27 @@ impl TryFrom<FormData> for NewPlayer {
 
 #[utoipa::path(
     tag = "Players", summary = "Register a player in the active event",
-    description = "Creates a player in the active event and allocates a four-digit PDN sequentially, skipping reserved and already assigned codes. New players have no team (team_id is null). Submit URL-encoded form data, not JSON.",
-    request_body(content = FormData, content_type = "application/x-www-form-urlencoded", example = json!({"name": "Alex", "email": "alex@example.com"})),
+    description = "Creates a player in the active event and allocates a four-digit PDN sequentially, skipping reserved and already assigned codes. New players have no team (team_id is null). Send application/json with name and optional email. Email may be omitted or null.",
+    request_body(content = RegisterPlayer, content_type = "application/json", example = json!({"name": "Alex", "email": "alex@example.com"})),
     responses((status = 200, description = "Registered player with assigned PIN, email, team details, and status", body = PlayerResponse),
-        (status = 400, description = "Missing or invalid name or email"),
+        (status = 400, description = "Invalid JSON or Content-Type, or missing or invalid name or email"),
         (status = 409, description = "No active event, duplicate name in the active event, or no PDN codes remaining. Text body without a Content-Type header.", body = String, content_type = "text/plain"),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
 )]
 #[post("/players")]
 #[tracing::instrument(
     name = "Registering player",
-    skip(form, pool),
+    skip(body, pool),
     fields(
-        name = %form.name,
-        email = %form.email.is_some(),
+        name = %body.name,
+        email = %body.email.is_some(),
     )
 )]
-pub async fn register_player(form: web::Form<FormData>, pool: web::Data<PgPool>) -> HttpResponse {
-    let new_player = match form.0.try_into() {
+pub async fn register_player(
+    body: web::Json<RegisterPlayer>,
+    pool: web::Data<PgPool>,
+) -> HttpResponse {
+    let new_player = match body.0.try_into() {
         Ok(player) => player,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };

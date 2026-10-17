@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_email() {
     let app = spawn_app_with_event().await;
     let response = app
-        .post_players("name=Alex&email=private-address%40example.com".into())
+        .post_players(json!({"name": "Alex", "email": "private-address@example.com"}))
         .await;
     let first: Value = assert_json(response, 200).await;
     let pin = first["pdn_code"].as_str().unwrap();
@@ -85,7 +85,7 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
     assert_eq!(by_pin["email"], first["email"]);
 
     app.activate_new_event().await;
-    let response = app.post_players("name=Second".into()).await;
+    let response = app.post_players(json!({"name": "Second"})).await;
     let second: Value = assert_json(response, 200).await;
     assert_eq!(second["pdn_code"], pin);
     assert_eq!(app.get(&id_path).await.status(), 404);
@@ -114,8 +114,8 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
 #[tokio::test]
 async fn player_is_retrieved_with_a_200() {
     let app = spawn_app_with_event().await;
-    let body = "name=Martha%20Wells&email=martha%40example.com";
-    let post_response = app.post_players(body.into()).await;
+    let body = json!({"name": "Martha Wells", "email": "martha@example.com"});
+    let post_response = app.post_players(body).await;
     assert_eq!(200, post_response.status().as_u16());
 
     let get_response = app.get_players().await;
@@ -141,12 +141,12 @@ async fn player_is_retrieved_with_a_200() {
 #[tokio::test]
 async fn listing_is_scoped_to_active_event_and_names_and_codes_can_be_reused() {
     let app = spawn_app_with_event().await;
-    assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
+    assert_eq!(app.post_players(json!({"name": "Nyx"})).await.status(), 200);
     let event_id = app.activate_new_event().await;
     let response = app.get_players().await;
     let empty: Value = assert_json(response, 200).await;
     assert_eq!(empty["players"].as_array().unwrap().len(), 0);
-    assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
+    assert_eq!(app.post_players(json!({"name": "Nyx"})).await.status(), 200);
     let response = app.get_players().await;
     let body: Value = assert_json(response, 200).await;
     assert_eq!(body["players"].as_array().unwrap().len(), 1);
@@ -175,7 +175,10 @@ async fn development_seed_is_repeatable_and_registration_works_afterward() {
             .await
             .unwrap();
     }
-    assert_eq!(app.post_players("name=Newcomer".into()).await.status(), 200);
+    assert_eq!(
+        app.post_players(json!({"name": "Newcomer"})).await.status(),
+        200
+    );
     let code: String = sqlx::query_scalar("SELECT pdn_code FROM players WHERE name = 'Newcomer'")
         .fetch_one(&app.db_pool)
         .await

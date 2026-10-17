@@ -1,4 +1,5 @@
 use crate::helpers::{assert_json, spawn_app, spawn_app_with_event};
+use serde_json::json;
 
 async fn assert_registration_conflict(response: reqwest::Response, message: &str) {
     assert_eq!(response.status(), 409);
@@ -7,10 +8,10 @@ async fn assert_registration_conflict(response: reqwest::Response, message: &str
 }
 
 #[tokio::test]
-async fn register_player_returns_a_200_for_valid_form_data() {
+async fn register_player_returns_a_200_for_valid_json() {
     let app = spawn_app_with_event().await;
-    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-    let response = app.post_players(body.into()).await;
+    let body = json!({"name": "le guin", "email": "ursula_le_guin@gmail.com"});
+    let response = app.post_players(body).await;
 
     let created: serde_json::Value = assert_json(response, 200).await;
     let saved = sqlx::query!("SELECT name, email, pdn_code FROM players",)
@@ -37,31 +38,68 @@ async fn register_player_returns_a_200_for_valid_form_data() {
 }
 
 #[tokio::test]
-async fn register_player_accepts_a_missing_email() {
+async fn register_player_accepts_an_omitted_or_null_email() {
     let app = spawn_app_with_event().await;
-    let body = "name=Ursula";
-    let response = app.post_players(body.into()).await;
-
-    assert_eq!(200, response.status().as_u16());
+    for body in [
+        json!({"name": "Ursula"}),
+        json!({"name": "Octavia", "email": null}),
+    ] {
+        let response = app.post_players(body.clone()).await;
+        let player: serde_json::Value = assert_json(response, 200).await;
+        assert_eq!(player["name"], body["name"]);
+        assert_eq!(player.get("email"), Some(&serde_json::Value::Null));
+    }
 
     let saved = sqlx::query!("SELECT name, email FROM players")
+        .fetch_all(&app.db_pool)
+        .await
+        .unwrap();
+    assert_eq!(saved.len(), 2);
+    for player in saved {
+        assert!(["Ursula", "Octavia"].contains(&player.name.as_str()));
+        assert_eq!(player.email, None);
+    }
+}
+
+#[tokio::test]
+async fn registration_rejects_form_data_and_malformed_json_without_creating_players() {
+    let app = spawn_app_with_event().await;
+    for (content_type, body) in [
+        ("application/x-www-form-urlencoded", "name=Alex"),
+        ("text/plain", r#"{"name":"Alex"}"#),
+        ("application/json", "{broken"),
+        ("application/json", ""),
+    ] {
+        let response = app
+            .post_bytes("/players", content_type, body.as_bytes().to_vec())
+            .await;
+        assert_eq!(response.status(), 400, "{content_type}: {body}");
+    }
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM players")
         .fetch_one(&app.db_pool)
         .await
-        .expect("Failed to fetch saved player.");
-
-    assert_eq!(saved.name, "Ursula");
-    assert_eq!(saved.email, None);
+        .unwrap();
+    assert_eq!(count, 0);
 }
 
 #[tokio::test]
 async fn register_player_returns_a_400_when_fields_are_present_but_invalid() {
     let app = spawn_app_with_event().await;
     let test_cases = vec![
-        ("name=&email=ursula_le_guin%40gamil.com", "empty name"),
-        ("name=Ursula&email=definitely-not-an-email", "invalid email"),
+        (
+            json!({"name": "", "email": "ursula_le_guin@example.com"}),
+            "empty name",
+        ),
+        (
+            json!({"name": "Ursula", "email": "definitely-not-an-email"}),
+            "invalid email",
+        ),
+        (json!({"name": null}), "null name"),
+        (json!({"name": 42}), "numeric name"),
+        (json!({"name": "Ursula", "email": 42}), "numeric email"),
     ];
     for (body, description) in test_cases {
-        let response = app.post_players(body.into()).await;
+        let response = app.post_players(body).await;
         assert_eq!(
             400,
             response.status().as_u16(),
@@ -74,10 +112,13 @@ async fn register_player_returns_a_400_when_fields_are_present_but_invalid() {
 #[tokio::test]
 async fn register_player_returns_a_400_when_data_is_missing() {
     let app = spawn_app_with_event().await;
-    let test_cases = vec![("", "missing the name"), ("score=100", "invalid parameter")];
+    let test_cases = vec![
+        (json!({}), "missing the name"),
+        (json!({"score": 100}), "invalid parameter"),
+    ];
 
     for (invalid_body, error_message) in test_cases {
-        let response = app.post_players(invalid_body.into()).await;
+        let response = app.post_players(invalid_body).await;
         assert_eq!(
             400,
             response.status().as_u16(),
@@ -90,8 +131,11 @@ async fn register_player_returns_a_400_when_data_is_missing() {
 #[tokio::test]
 async fn registration_requires_an_active_event() {
     let app = spawn_app().await;
-    assert_registration_conflict(app.post_players("name=Nyx".into()).await, "No active event")
-        .await;
+    assert_registration_conflict(
+        app.post_players(json!({"name": "Nyx"})).await,
+        "No active event",
+    )
+    .await;
     let count: i64 = sqlx::query_scalar("SELECT count(*) FROM players")
         .fetch_one(&app.db_pool)
         .await
@@ -106,19 +150,25 @@ async fn allocation_skips_reserved_and_used_codes_and_rolls_back_on_duplicate_na
         .execute(&app.db_pool)
         .await
         .unwrap();
-    assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
+    assert_eq!(app.post_players(json!({"name": "Nyx"})).await.status(), 200);
     assert_registration_conflict(
-        app.post_players("name=Nyx".into()).await,
+        app.post_players(json!({"name": "Nyx"})).await,
         "Player name already exists in the active event",
     )
     .await;
-    assert_eq!(app.post_players("name=Rook".into()).await.status(), 200);
+    assert_eq!(
+        app.post_players(json!({"name": "Rook"})).await.status(),
+        200
+    );
     // Simulate an imported player ahead of the counter.
     sqlx::query("UPDATE events SET next_pdn_code = 1")
         .execute(&app.db_pool)
         .await
         .unwrap();
-    assert_eq!(app.post_players("name=Echo".into()).await.status(), 200);
+    assert_eq!(
+        app.post_players(json!({"name": "Echo"})).await.status(),
+        200
+    );
     let codes: Vec<String> = sqlx::query_scalar("SELECT pdn_code FROM players ORDER BY pdn_code")
         .fetch_all(&app.db_pool)
         .await
@@ -133,10 +183,13 @@ async fn exhausted_event_returns_conflict_without_creating_a_player() {
         .execute(&app.db_pool)
         .await
         .unwrap();
-    assert_eq!(app.post_players("name=Last".into()).await.status(), 200);
+    assert_eq!(
+        app.post_players(json!({"name": "Last"})).await.status(),
+        200
+    );
     // 9999 is reserved.
     assert_registration_conflict(
-        app.post_players("name=Overflow".into()).await,
+        app.post_players(json!({"name": "Overflow"})).await,
         "No PDN codes available for the active event",
     )
     .await;
@@ -145,7 +198,7 @@ async fn exhausted_event_returns_conflict_without_creating_a_player() {
         .await
         .unwrap();
     assert_registration_conflict(
-        app.post_players("name=Overflow".into()).await,
+        app.post_players(json!({"name": "Overflow"})).await,
         "No PDN codes available for the active event",
     )
     .await;
@@ -160,8 +213,8 @@ async fn exhausted_event_returns_conflict_without_creating_a_player() {
 async fn concurrent_registrations_allocate_distinct_sequential_codes() {
     let app = spawn_app_with_event().await;
     let (first, second) = tokio::join!(
-        app.post_players("name=Nyx".into()),
-        app.post_players("name=Rook".into())
+        app.post_players(json!({"name": "Nyx"})),
+        app.post_players(json!({"name": "Rook"}))
     );
     assert_eq!(first.status(), 200);
     assert_eq!(second.status(), 200);

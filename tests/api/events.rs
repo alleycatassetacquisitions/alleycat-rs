@@ -91,7 +91,7 @@ async fn a_listed_event_can_be_selected_for_registration() {
     assert_eq!(listed_again, listed);
     assert_eq!(active(&app).await, Some(selected_id));
 
-    let response = app.post_players("name=Nyx".into()).await;
+    let response = app.post_players(json!({"name": "Nyx"})).await;
     assert_eq!(response.status(), 200);
     let registered_event: Uuid =
         sqlx::query_scalar("SELECT event_id FROM players WHERE name = 'Nyx'")
@@ -118,7 +118,7 @@ async fn events_can_be_created_edited_and_switched_without_losing_players_or_cod
             .status(),
         204
     );
-    assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
+    assert_eq!(app.post_players(json!({"name": "Nyx"})).await.status(), 200);
 
     let updated = app
         .request_json(Method::PATCH, &path, json!({"name": "Renamed"}))
@@ -151,7 +151,7 @@ async fn events_can_be_created_edited_and_switched_without_losing_players_or_cod
     );
     let players: Value = app.get_players().await.json().await.unwrap();
     assert_eq!(players["players"], json!([]));
-    assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
+    assert_eq!(app.post_players(json!({"name": "Nyx"})).await.status(), 200);
     for _ in 0..2 {
         assert_eq!(
             app.request_json(Method::PUT, &format!("{path}/active"), json!(null))
@@ -160,7 +160,10 @@ async fn events_can_be_created_edited_and_switched_without_losing_players_or_cod
             204
         );
     }
-    assert_eq!(app.post_players("name=Echo".into()).await.status(), 200);
+    assert_eq!(
+        app.post_players(json!({"name": "Echo"})).await.status(),
+        200
+    );
     let players: Value = app.get_players().await.json().await.unwrap();
     assert_eq!(players["players"].as_array().unwrap().len(), 2);
     assert_eq!(players["players"][0]["pdn_code"], "0002");

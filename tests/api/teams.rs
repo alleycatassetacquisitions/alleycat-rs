@@ -198,7 +198,7 @@ async fn membership_is_nullable_event_scoped_and_stable_across_rename() {
         .await
         .error_for_status()
         .unwrap();
-    assert_eq!(app.post_players("name=Nyx".into()).await.status(), 200);
+    assert_eq!(app.post_players(json!({"name": "Nyx"})).await.status(), 200);
     let players: Value = app.get_players().await.json().await.unwrap();
     assert_eq!(players["players"][0].get("team_id"), Some(&Value::Null));
     let player = Uuid::parse_str(players["players"][0]["id"].as_str().unwrap()).unwrap();

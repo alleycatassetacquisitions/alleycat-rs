@@ -139,9 +139,9 @@ async fn important_wire_contracts_survive_production_registration() {
 
     // Distinct wire formats and PATCH null semantics merit targeted assertions;
     // this is deliberately not an inventory of every handler or response field.
-    let form = &paths["/players"]["post"]["requestBody"]["content"];
-    assert!(form.get("application/x-www-form-urlencoded").is_some());
-    assert!(form.get("application/json").is_none());
+    let registration = &paths["/players"]["post"]["requestBody"]["content"];
+    assert_eq!(registration.as_object().unwrap().len(), 1);
+    assert!(registration.get("application/json").is_some());
     let protobuf = &paths["/device-logs"]["post"]["requestBody"]["content"];
     assert_eq!(
         protobuf["application/protobuf"]["schema"],

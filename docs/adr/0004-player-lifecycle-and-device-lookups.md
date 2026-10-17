@@ -5,7 +5,7 @@
 
 ## Context
 
-Operators need to fix player details, move players between teams, and mark a
+Operators need to fix player details, assign players to teams, and mark a
 player inactive. Deleting a player would cause problems for matches they've
 already played, so we need a way to keep that history intact.
 
