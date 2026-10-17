@@ -4,6 +4,7 @@ use alleycat_rs::telemetry::{get_subscriber, init_subscriber};
 use prost::Message;
 use reqwest::{Client, Method, RequestBuilder, Response};
 use secrecy::Secret;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
@@ -25,6 +26,12 @@ pub struct TestApp {
     address: String,
     client: Client,
     pub db_pool: PgPool,
+}
+
+pub async fn assert_json<T: DeserializeOwned>(response: Response, expected_status: u16) -> T {
+    assert_eq!(response.status(), expected_status);
+    assert_eq!(response.headers()["content-type"], "application/json");
+    response.json().await.expect("Response was not valid JSON.")
 }
 
 pub async fn assert_text_error(response: Response, status: u16) -> String {
@@ -80,11 +87,7 @@ impl TestApp {
     // Create an event through the API without changing the active selection.
     pub async fn create_event(&self, body: Value) -> Value {
         let response = self.request_json(Method::POST, "/events", body).await;
-        assert_eq!(response.status(), 201, "Failed to create fixture event.");
-        response
-            .json()
-            .await
-            .expect("Event response was not valid JSON.")
+        assert_json(response, 201).await
     }
 
     // Seed an active event directly for tests that need one as a prerequisite.

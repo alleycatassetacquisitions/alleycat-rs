@@ -1,6 +1,5 @@
-use crate::helpers::spawn_app;
+use crate::helpers::{assert_json, spawn_app};
 use alleycat_rs::proto::alleycat::device::WriteDeviceLogRequest;
-use reqwest::header::CONTENT_TYPE;
 use serde_json::Value;
 
 #[tokio::test]
@@ -22,16 +21,7 @@ async fn get_device_logs_returns_json_with_saved_reports() {
 
     let response = app.get("/device-logs").await;
 
-    assert_eq!(200, response.status().as_u16());
-    assert_eq!(
-        response.headers().get(CONTENT_TYPE).unwrap(),
-        "application/json"
-    );
-
-    let body = response
-        .json::<Value>()
-        .await
-        .expect("Response was not valid JSON.");
+    let body: Value = assert_json(response, 200).await;
 
     let device_logs = body["device_logs"]
         .as_array()

@@ -1,4 +1,4 @@
-use crate::helpers::{TestApp, assert_text_error, spawn_app};
+use crate::helpers::{TestApp, assert_json, assert_text_error, spawn_app};
 use reqwest::Method;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -7,8 +7,7 @@ async fn teams(app: &TestApp, event: &str) -> Vec<Value> {
     let response = app
         .request_json(Method::GET, &format!("/events/{event}/teams"), json!(null))
         .await;
-    assert_eq!(response.status(), 200);
-    response.json().await.unwrap()
+    assert_json(response, 200).await
 }
 
 #[tokio::test]
@@ -37,8 +36,7 @@ async fn teams_start_empty_and_are_created_renamed_and_isolated_by_event() {
     let response = app
         .request_json(Method::POST, &path, json!({"name": "  Runners  "}))
         .await;
-    assert_eq!(response.status(), 201);
-    let created: Value = response.json().await.unwrap();
+    let created: Value = assert_json(response, 201).await;
     let id = created["id"].as_str().unwrap();
     Uuid::parse_str(id).unwrap();
     assert_eq!(created["name"], "Runners");
@@ -64,8 +62,7 @@ async fn teams_start_empty_and_are_created_renamed_and_isolated_by_event() {
         let response = app
             .request_json(Method::PATCH, &rename, json!({"name": " Sprinters "}))
             .await;
-        assert_eq!(response.status(), 200);
-        let renamed: Value = response.json().await.unwrap();
+        let renamed: Value = assert_json(response, 200).await;
         assert_eq!(renamed["id"], id);
         assert_eq!(renamed["name"], "Sprinters");
     }
@@ -171,16 +168,15 @@ async fn name_length_is_checked_for_creation_and_rename() {
         let response = app
             .request_json(Method::POST, &path, json!({"name": name}))
             .await;
-        assert_eq!(response.status(), 201);
-        let created: Value = response.json().await.unwrap();
+        let created: Value = assert_json(response, 201).await;
         assert_eq!(created["name"], name);
         let rename = format!("{path}/{}", created["id"].as_str().unwrap());
         let name = renamed_char.repeat(256);
         let response = app
             .request_json(Method::PATCH, &rename, json!({"name": name}))
             .await;
-        assert_eq!(response.status(), 200);
-        assert_eq!(response.json::<Value>().await.unwrap()["name"], name);
+        let renamed: Value = assert_json(response, 200).await;
+        assert_eq!(renamed["name"], name);
 
         let before = teams(&app, event).await;
         for (method, target) in [(Method::POST, &path), (Method::PATCH, &rename)] {

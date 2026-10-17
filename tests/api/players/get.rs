@@ -1,5 +1,4 @@
-use crate::helpers::{spawn_app, spawn_app_with_event};
-use reqwest::header::CONTENT_TYPE;
+use crate::helpers::{assert_json, spawn_app, spawn_app_with_event};
 use serde_json::Value;
 
 #[tokio::test]
@@ -11,16 +10,7 @@ async fn player_is_retrieved_with_a_200() {
 
     let get_response = app.get_players().await;
 
-    assert_eq!(200, get_response.status().as_u16());
-    assert_eq!(
-        get_response.headers().get(CONTENT_TYPE).unwrap(),
-        "application/json"
-    );
-
-    let body = get_response
-        .json::<Value>()
-        .await
-        .expect("Response was not valid JSON.");
+    let body: Value = assert_json(get_response, 200).await;
 
     let players = body["players"]
         .as_array()

@@ -1,4 +1,4 @@
-use crate::helpers::{TestApp, assert_text_error, spawn_app};
+use crate::helpers::{TestApp, assert_json, assert_text_error, spawn_app};
 use alleycat_rs::proto::alleycat::device::{QuickdrawMatch, WriteQuickdrawMatchesRequest};
 use chrono::{DateTime, Utc};
 use prost::Message;
@@ -71,8 +71,7 @@ impl Game {
 
     async fn list(&self, app: &TestApp) -> Value {
         let response = app.get(&self.path()).await;
-        assert_eq!(response.status(), 200);
-        response.json().await.unwrap()
+        assert_json(response, 200).await
     }
 
     async fn period(&self, app: &TestApp, start: i64, end: Option<i64>) {
@@ -326,8 +325,7 @@ async fn listing_uses_explicit_event_and_stable_timestamp_and_id_order() {
         204
     );
     let response = app.get(&format!("{}?per_page=2", game.path())).await;
-    assert_eq!(response.status(), 200);
-    let first: Value = response.json().await.unwrap();
+    let first: Value = assert_json(response, 200).await;
     assert_eq!(first["pagination"], json!({"page": 1, "per_page": 2}));
     assert_eq!(first["matches"][0]["id"], Uuid::from_u128(2).to_string());
     assert_eq!(first["matches"][1]["id"], Uuid::from_u128(3).to_string());

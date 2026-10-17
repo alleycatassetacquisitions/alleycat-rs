@@ -90,9 +90,7 @@ For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/R
 [Architecture decision records](docs/adr/README.md) explain significant design
 choices, their rationale, and tradeoffs.
 
-## Routine commands
-
-### Manage the local stack
+## Manage the local stack
 
 ```bash
 # Follow API logs.
