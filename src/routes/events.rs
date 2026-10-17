@@ -1,6 +1,6 @@
 use crate::routes::errors::database_error;
 use actix_web::{HttpResponse, error, web};
-use actix_web::{patch, post, put};
+use actix_web::{get, patch, post, put};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::PgPool;
@@ -56,6 +56,24 @@ fn validate_venue(venue: Option<&str>) -> actix_web::Result<()> {
         ));
     }
     Ok(())
+}
+
+#[utoipa::path(
+    tag = "Events", summary = "List events",
+    description = "Returns all events, newest first, with IDs for selecting the registration event. Ties are ordered by ID descending. Returns an empty array when no events exist. Does not depend on or change the active event.",
+    responses((status = 200, description = "All events", body = Vec<EventResponse>),
+        (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
+)]
+#[get("/events")]
+pub async fn list_events(pool: web::Data<PgPool>) -> actix_web::Result<HttpResponse> {
+    let events = sqlx::query_as!(
+        EventResponse,
+        "SELECT id, name, venue_name, created_at FROM events ORDER BY created_at DESC, id DESC"
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|error| database_error(error, "Event operation failed"))?;
+    Ok(HttpResponse::Ok().json(events))
 }
 
 #[utoipa::path(

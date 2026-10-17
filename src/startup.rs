@@ -1,8 +1,8 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::routes::{
     VersionInfo, configure_documentation, create_event, create_team, get_device_logs, get_players,
-    get_quickdraw_matches, get_scoring, get_version, health_check, list_teams, register_player,
-    rename_team, set_active_event, set_scoring, update_event, write_device_log,
+    get_quickdraw_matches, get_scoring, get_version, health_check, list_events, list_teams,
+    register_player, rename_team, set_active_event, set_scoring, update_event, write_device_log,
     write_quickdraw_matches,
 };
 use actix_web::dev::Server;
@@ -37,6 +37,7 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
             .service(write_device_log)
             .service(get_players)
             .service(register_player)
+            .service(list_events)
             .service(create_event)
             .service(update_event)
             .service(set_active_event)

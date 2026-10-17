@@ -1,4 +1,4 @@
-use crate::helpers::{TestApp, assert_text_error, spawn_app};
+use crate::helpers::{TestApp, assert_json, assert_text_error, spawn_app};
 use chrono::{DateTime, Utc};
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -12,8 +12,7 @@ async fn set(app: &TestApp, event: Uuid, enabled: bool) -> Value {
             json!({"enabled": enabled}),
         )
         .await;
-    assert_eq!(response.status(), 200);
-    response.json().await.unwrap()
+    assert_json(response, 200).await
 }
 
 #[tokio::test]

@@ -29,7 +29,7 @@ impl TryFrom<FormData> for NewPlayer {
 
 #[utoipa::path(
     tag = "Players", summary = "Register a player in the active event",
-    description = "Creates a player and allocates a four-digit PDN. Submit URL-encoded form data, not JSON.",
+    description = "Creates a player in the active event and allocates a four-digit PDN sequentially, skipping reserved and already assigned codes. New players have no team (team_id is null). Submit URL-encoded form data, not JSON.",
     request_body(content = FormData, content_type = "application/x-www-form-urlencoded", example = json!({"name": "Alex", "email": "alex@example.com"})),
     responses((status = 200, description = "Player registered; empty body"),
         (status = 400, description = "Missing or invalid name or email"),

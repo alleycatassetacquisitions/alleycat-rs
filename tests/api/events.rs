@@ -1,4 +1,4 @@
-use crate::helpers::{TestApp, assert_text_error, spawn_app};
+use crate::helpers::{TestApp, assert_json, assert_text_error, spawn_app};
 use reqwest::Method;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -7,6 +7,98 @@ async fn active(app: &TestApp) -> Option<Uuid> {
     alleycat_rs::events::get_active_event_id(&app.db_pool)
         .await
         .unwrap()
+}
+
+#[tokio::test]
+async fn listing_events_returns_an_empty_array_when_none_exist() {
+    let app = spawn_app().await;
+    let response = app.get("/events").await;
+    let listed: Value = assert_json(response, 200).await;
+    assert_eq!(listed, json!([]));
+}
+
+#[tokio::test]
+async fn listing_events_orders_by_creation_time_then_id() {
+    let app = spawn_app().await;
+    // The newest event has the lowest ID so time must take precedence.
+    let newest = json!({
+        "id": Uuid::from_u128(1),
+        "name": "Newest",
+        "venue_name": "Main Hall",
+        "created_at": "2026-01-02T00:00:00Z"
+    });
+    let older_higher_id = json!({
+        "id": Uuid::from_u128(3),
+        "name": "Older, higher ID",
+        "venue_name": null,
+        "created_at": "2026-01-01T00:00:00Z"
+    });
+    let older_lower_id = json!({
+        "id": Uuid::from_u128(2),
+        "name": "Older, lower ID",
+        "venue_name": "Side Hall",
+        "created_at": "2026-01-01T00:00:00Z"
+    });
+    // Insert out of order; the listing must establish its own order.
+    for event in [&older_lower_id, &newest, &older_higher_id] {
+        let id = Uuid::parse_str(event["id"].as_str().unwrap()).unwrap();
+        let created_at: chrono::DateTime<chrono::Utc> =
+            event["created_at"].as_str().unwrap().parse().unwrap();
+        sqlx::query(
+            "INSERT INTO events (id, name, venue_name, created_at) VALUES ($1, $2, $3, $4)",
+        )
+        .bind(id)
+        .bind(event["name"].as_str().unwrap())
+        .bind(event["venue_name"].as_str())
+        .bind(created_at)
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+    }
+
+    let response = app.get("/events").await;
+    let listed: Value = assert_json(response, 200).await;
+
+    assert_eq!(listed, json!([newest, older_higher_id, older_lower_id]));
+}
+
+#[tokio::test]
+async fn a_listed_event_can_be_selected_for_registration() {
+    let app = spawn_app().await;
+    let first = app
+        .create_event(json!({"name": "First", "venue_name": "Hall"}))
+        .await;
+    let second = app.create_event(json!({"name": "Second"})).await;
+
+    let response = app.get("/events").await;
+    let listed: Vec<Value> = assert_json(response, 200).await;
+    assert_eq!(listed.len(), 2);
+    assert!(listed.contains(&first));
+    assert!(listed.contains(&second));
+    assert_eq!(active(&app).await, None);
+
+    let selected_id = Uuid::parse_str(listed[0]["id"].as_str().unwrap()).unwrap();
+    let response = app
+        .request(Method::PUT, &format!("/events/{selected_id}/active"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 204);
+
+    // Listing still includes every event and preserves the active selection.
+    let response = app.get("/events").await;
+    let listed_again: Vec<Value> = assert_json(response, 200).await;
+    assert_eq!(listed_again, listed);
+    assert_eq!(active(&app).await, Some(selected_id));
+
+    let response = app.post_players("name=Nyx".into()).await;
+    assert_eq!(response.status(), 200);
+    let registered_event: Uuid =
+        sqlx::query_scalar("SELECT event_id FROM players WHERE name = 'Nyx'")
+            .fetch_one(&app.db_pool)
+            .await
+            .unwrap();
+    assert_eq!(registered_event, selected_id);
 }
 
 #[tokio::test]
@@ -31,16 +123,14 @@ async fn events_can_be_created_edited_and_switched_without_losing_players_or_cod
     let updated = app
         .request_json(Method::PATCH, &path, json!({"name": "Renamed"}))
         .await;
-    assert_eq!(updated.status(), 200);
-    let updated: Value = updated.json().await.unwrap();
+    let updated: Value = assert_json(updated, 200).await;
     assert_eq!(updated["name"], "Renamed");
     assert_eq!(updated["venue_name"], "Hall");
     assert_eq!(updated["created_at"], first["created_at"]);
     let cleared = app
         .request_json(Method::PATCH, &path, json!({"venue_name": null}))
         .await;
-    assert_eq!(cleared.status(), 200);
-    let cleared: Value = cleared.json().await.unwrap();
+    let cleared: Value = assert_json(cleared, 200).await;
     assert_eq!(cleared["name"], "Renamed");
     assert_eq!(cleared["venue_name"], Value::Null);
 
