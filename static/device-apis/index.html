@@ -513,7 +513,7 @@ Must fit a signed 32-bit integer (maximum 2147483647). Zero is valid. </p></td>
         
       
         <h3 id="alleycat.device.WriteQuickdrawMatchesRequest">WriteQuickdrawMatchesRequest</h3>
-        <p>POST /events/{event_id}/quickdraw-matches, application/protobuf.</p><p>Send 1-100 completed matches for the explicit event. The batch is atomic:</p><p>204 means every result was saved or already existed; failures save none.</p>
+        <p>POST /quickdraw-matches, application/protobuf.</p><p>Send 1-100 completed matches for the currently active event. The server holds</p><p>that selection until the batch commits. No active event returns 409.</p><p>New matches must reference players and teams in the active event (400 otherwise).</p><p>A match ID already stored in another event returns 409, including on retries.</p><p>After an event switch, old-event uploads are rejected; they can be retried if</p><p>that event is selected again. Scoring still uses match time and the event's</p><p>delayed-score setting. Errors are plain text. The batch is atomic:</p><p>204 means every result was saved or already existed; failures save none.</p>
 
         
           <table class="field-table">

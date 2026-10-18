@@ -10,13 +10,9 @@ async fn register(app: &TestApp, name: &str) -> Value {
     assert_json(response, 200).await
 }
 
-async fn team(app: &TestApp, event: &str, name: &str) -> Value {
+async fn team(app: &TestApp, name: &str) -> Value {
     let response = app
-        .request_json(
-            Method::POST,
-            &format!("/events/{event}/teams"),
-            json!({"name": name}),
-        )
+        .request_json(Method::POST, "/teams", json!({"name": name}))
         .await;
     assert_json(response, 201).await
 }
@@ -26,10 +22,9 @@ async fn players_can_edit_clear_and_restore_fields_without_changing_identity() {
     let app = spawn_app_with_event().await;
     let created = register(&app, "Alex").await;
     let id = created["id"].as_str().unwrap();
-    let event = created["event_id"].as_str().unwrap();
     let path = format!("/players/{id}");
-    let first_team = team(&app, event, "Runners").await;
-    let second_team = team(&app, event, "Couriers").await;
+    let first_team = team(&app, "Runners").await;
+    let second_team = team(&app, "Couriers").await;
     let response = app
         .request_json(
             Method::PATCH,
@@ -84,7 +79,11 @@ async fn invalid_updates_and_conflicts_leave_the_player_unchanged() {
     register(&app, "Taken").await;
     let path = format!("/players/{}", created["id"].as_str().unwrap());
     let other_event = app.create_event(json!({"name": "Other"})).await;
-    let other_team = team(&app, other_event["id"].as_str().unwrap(), "Other team").await;
+    app.select_event(Uuid::parse_str(other_event["id"].as_str().unwrap()).unwrap())
+        .await;
+    let other_team = team(&app, "Other team").await;
+    app.select_event(Uuid::parse_str(created["event_id"].as_str().unwrap()).unwrap())
+        .await;
     for body in [
         json!({}),
         json!({"name": null}),

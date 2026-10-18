@@ -42,11 +42,8 @@ impl Game {
             .await
             .unwrap();
         }
+        app.select_event(game.event).await;
         game
-    }
-
-    fn path(&self) -> String {
-        format!("/events/{}/quickdraw-matches", self.event)
     }
 
     fn report(&self, id: u128, timestamp: i64) -> QuickdrawMatch {
@@ -64,22 +61,25 @@ impl Game {
         }
     }
 
-    async fn upload(&self, app: &TestApp, matches: Vec<QuickdrawMatch>) -> reqwest::Response {
-        app.post_protobuf(&self.path(), &WriteQuickdrawMatchesRequest { matches })
-            .await
-    }
-
-    async fn list(&self, app: &TestApp) -> Value {
-        let response = app.get(&self.path()).await;
-        assert_json(response, 200).await
-    }
-
     async fn period(&self, app: &TestApp, start: i64, end: Option<i64>) {
         sqlx::query("INSERT INTO event_scoring_periods (event_id, started_at, closes_at) VALUES ($1, $2, $3)")
             .bind(self.event).bind(DateTime::from_timestamp_millis(start).unwrap())
             .bind(end.map(|ms| DateTime::from_timestamp_millis(ms).unwrap()))
             .execute(&app.db_pool).await.unwrap();
     }
+}
+
+async fn upload(app: &TestApp, matches: Vec<QuickdrawMatch>) -> reqwest::Response {
+    app.post_protobuf(
+        "/quickdraw-matches",
+        &WriteQuickdrawMatchesRequest { matches },
+    )
+    .await
+}
+
+async fn list(app: &TestApp) -> Value {
+    let response = app.get("/quickdraw-matches").await;
+    assert_json(response, 200).await
 }
 
 #[tokio::test]
@@ -104,14 +104,14 @@ async fn delayed_matches_use_period_boundaries_and_device_team_snapshots() {
         .fetch_one(&app.db_pool)
         .await
         .unwrap();
-    let response = game.upload(&app, reports).await;
+    let response = upload(&app, reports).await;
     assert_eq!(response.status(), 204);
     assert!(response.bytes().await.unwrap().is_empty());
     let after: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&app.db_pool)
         .await
         .unwrap();
-    let body = game.list(&app).await;
+    let body = list(&app).await;
     let matches = body["matches"].as_array().unwrap();
     assert_eq!(matches.len(), 7);
     for (id, status) in [
@@ -147,14 +147,10 @@ async fn delayed_matches_use_period_boundaries_and_device_team_snapshots() {
         .await
         .unwrap();
     let response = app
-        .request_json(
-            Method::PUT,
-            &format!("/events/{}/scoring", game.event),
-            json!({"enabled": true}),
-        )
+        .request_json(Method::PUT, "/scoring", json!({"enabled": true}))
         .await;
     assert_eq!(response.status(), 200);
-    assert_eq!(game.list(&app).await, body);
+    assert_eq!(list(&app).await, body);
 }
 
 #[tokio::test]
@@ -164,12 +160,10 @@ async fn player_team_edits_and_deactivation_preserve_history_and_delayed_uploads
     let start = 1_790_000_000_000;
     game.period(&app, start, Some(start + 1000)).await;
     assert_eq!(
-        game.upload(&app, vec![game.report(1, start)])
-            .await
-            .status(),
+        upload(&app, vec![game.report(1, start)]).await.status(),
         204
     );
-    let original = game.list(&app).await;
+    let original = list(&app).await;
     assert_eq!(
         app.request_json(
             Method::PUT,
@@ -190,14 +184,14 @@ async fn player_team_edits_and_deactivation_preserve_history_and_delayed_uploads
         .status(),
         200
     );
-    assert_eq!(game.list(&app).await, original);
+    assert_eq!(list(&app).await, original);
     assert_eq!(
-        game.upload(&app, vec![game.report(1, start), game.report(2, start + 1)])
+        upload(&app, vec![game.report(1, start), game.report(2, start + 1)])
             .await
             .status(),
         204
     );
-    let matches = game.list(&app).await;
+    let matches = list(&app).await;
     assert_eq!(matches["matches"].as_array().unwrap().len(), 2);
     for row in matches["matches"].as_array().unwrap() {
         assert_eq!(row["scoring_status"], "scoring");
@@ -217,34 +211,31 @@ async fn retries_preserve_the_first_report_including_receipt_time() {
     second.winner_player_id = game.players[0].to_string();
     second.player_b_team_id = None;
     assert_eq!(
-        game.upload(&app, vec![first.clone(), second.clone()])
+        upload(&app, vec![first.clone(), second.clone()])
             .await
             .status(),
         204
     );
-    let saved = game.list(&app).await;
+    let saved = list(&app).await;
     assert_eq!(saved["matches"].as_array().unwrap().len(), 1);
     assert_eq!(saved["matches"][0]["player_a_draw_time_ms"], 0);
     // A period added later must not rescore a duplicate.
     game.period(&app, 1_790_000_000_000, None).await;
     let (a, b) = tokio::join!(
-        game.upload(&app, vec![second.clone()]),
-        game.upload(&app, vec![first]),
+        upload(&app, vec![second.clone()]),
+        upload(&app, vec![first]),
     );
     assert_eq!(a.status(), 204);
     assert_eq!(b.status(), 204);
-    assert_eq!(game.list(&app).await, saved);
+    assert_eq!(list(&app).await, saved);
 
     second.id = Uuid::from_u128(2).to_string();
     let mut competing = second.clone();
     competing.player_a_draw_time_ms = Some(99);
-    let (a, b) = tokio::join!(
-        game.upload(&app, vec![second]),
-        game.upload(&app, vec![competing]),
-    );
+    let (a, b) = tokio::join!(upload(&app, vec![second]), upload(&app, vec![competing]),);
     assert_eq!(a.status(), 204);
     assert_eq!(b.status(), 204);
-    let saved = game.list(&app).await;
+    let saved = list(&app).await;
     assert_eq!(saved["matches"].as_array().unwrap().len(), 2);
     assert!([json!(50), json!(99)].contains(&saved["matches"][0]["player_a_draw_time_ms"]));
 }
@@ -256,15 +247,13 @@ async fn delayed_score_switch_records_closed_period_matches_without_rescoring_re
     let start = 1_790_000_000_000;
     game.period(&app, start, Some(start + 1000)).await;
     game.period(&app, start + 2000, None).await;
-    let path = format!("/events/{}/delayed-scores", game.event);
+    let path = "/delayed-scores";
     assert_eq!(
-        game.upload(&app, vec![game.report(1, start)])
-            .await
-            .status(),
+        upload(&app, vec![game.report(1, start)]).await.status(),
         204
     );
     assert_eq!(
-        app.request_json(Method::PUT, &path, json!({"enabled": false}))
+        app.request_json(Method::PUT, path, json!({"enabled": false}))
             .await
             .status(),
         200
@@ -274,7 +263,7 @@ async fn delayed_score_switch_records_closed_period_matches_without_rescoring_re
     let mut same_team = game.report(7, start);
     same_team.player_b_team_id = same_team.player_a_team_id.clone();
     assert_eq!(
-        game.upload(
+        upload(
             &app,
             vec![
                 game.report(1, start),
@@ -289,7 +278,7 @@ async fn delayed_score_switch_records_closed_period_matches_without_rescoring_re
         .status(),
         204
     );
-    let before = game.list(&app).await;
+    let before = list(&app).await;
     for (id, status) in [
         (1, "scoring"),
         (2, "delayed_scores_disabled"),
@@ -307,25 +296,21 @@ async fn delayed_score_switch_records_closed_period_matches_without_rescoring_re
         assert_eq!(row["scoring_status"], status);
     }
     assert_eq!(
-        app.request_json(Method::PUT, &path, json!({"enabled": true}))
+        app.request_json(Method::PUT, path, json!({"enabled": true}))
             .await
             .status(),
         200
     );
     assert_eq!(
-        game.upload(&app, vec![game.report(2, start)])
-            .await
-            .status(),
+        upload(&app, vec![game.report(2, start)]).await.status(),
         204
     );
-    assert_eq!(game.list(&app).await, before);
+    assert_eq!(list(&app).await, before);
     assert_eq!(
-        game.upload(&app, vec![game.report(5, start)])
-            .await
-            .status(),
+        upload(&app, vec![game.report(5, start)]).await.status(),
         204
     );
-    let after = game.list(&app).await;
+    let after = list(&app).await;
     let row = after["matches"]
         .as_array()
         .unwrap()
@@ -348,7 +333,7 @@ async fn ingestion_reads_the_delayed_score_setting_after_waiting_for_its_update(
         .await
         .unwrap();
     let request = app
-        .request(Method::POST, &game.path())
+        .request(Method::POST, "/quickdraw-matches")
         .header("Content-Type", "application/protobuf")
         .body(
             WriteQuickdrawMatchesRequest {
@@ -365,7 +350,7 @@ async fn ingestion_reads_the_delayed_score_setting_after_waiting_for_its_update(
     transaction.commit().await.unwrap();
     assert_eq!(upload.await.unwrap().status(), 204);
     assert_eq!(
-        game.list(&app).await["matches"][0]["scoring_status"],
+        list(&app).await["matches"][0]["scoring_status"],
         "delayed_scores_disabled"
     );
 }
@@ -375,6 +360,7 @@ async fn invalid_event_references_roll_back_the_whole_batch() {
     let app = spawn_app().await;
     let game = Game::create(&app).await;
     let other = Game::create(&app).await;
+    app.select_event(game.event).await;
     for index in 0..4 {
         let first = game.report(1, 1000);
         let mut invalid = game.report(2, 1000);
@@ -387,13 +373,8 @@ async fn invalid_event_references_roll_back_the_whole_batch() {
             2 => invalid.player_a_team_id = Some(other.teams[0].to_string()),
             _ => invalid.player_b_team_id = Some(Uuid::new_v4().to_string()),
         }
-        assert_text_error(game.upload(&app, vec![first, invalid]).await, 400).await;
-        assert!(
-            game.list(&app).await["matches"]
-                .as_array()
-                .unwrap()
-                .is_empty()
-        );
+        assert_text_error(upload(&app, vec![first, invalid]).await, 400).await;
+        assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
     }
 }
 
@@ -420,45 +401,40 @@ async fn invalid_fields_and_batch_sizes_are_rejected_without_writes() {
             13 => report.occurred_at_unix_ms = Some(i64::MAX),
             _ => report.winner_player_id.clear(),
         }
-        assert_text_error(game.upload(&app, vec![report]).await, 400).await;
+        assert_text_error(upload(&app, vec![report]).await, 400).await;
     }
     for size in [0, 101] {
-        assert_text_error(
-            game.upload(&app, vec![game.report(1, 1000); size]).await,
-            400,
-        )
-        .await;
+        assert_text_error(upload(&app, vec![game.report(1, 1000); size]).await, 400).await;
     }
     assert_text_error(
-        app.post_bytes(&game.path(), "application/protobuf", vec![0xff])
+        app.post_bytes("/quickdraw-matches", "application/protobuf", vec![0xff])
             .await,
         400,
     )
     .await;
     assert_text_error(
-        app.post_bytes(&game.path(), "application/json", b"{}".to_vec())
+        app.post_bytes("/quickdraw-matches", "application/json", b"{}".to_vec())
             .await,
         415,
     )
     .await;
     assert_text_error(
-        app.post_bytes(&game.path(), "application/protobuf", vec![0; 262_145])
-            .await,
+        app.post_bytes(
+            "/quickdraw-matches",
+            "application/protobuf",
+            vec![0; 262_145],
+        )
+        .await,
         413,
     )
     .await;
-    assert!(
-        game.list(&app).await["matches"]
-            .as_array()
-            .unwrap()
-            .is_empty()
-    );
+    assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
 
     let mut report = game.report(1, 253_402_300_799_999);
     report.player_a_draw_time_ms = Some(i64::MAX as u64);
     report.player_b_draw_time_ms = Some(i64::MAX as u64);
-    assert_eq!(game.upload(&app, vec![report; 100]).await.status(), 204);
-    let saved = game.list(&app).await;
+    assert_eq!(upload(&app, vec![report; 100]).await.status(), 204);
+    let saved = list(&app).await;
     assert_eq!(saved["matches"].as_array().unwrap().len(), 1);
     assert_eq!(saved["matches"][0]["player_a_draw_time_ms"], i64::MAX);
     assert_eq!(saved["matches"][0]["player_b_draw_time_ms"], i64::MAX);
@@ -469,13 +445,11 @@ async fn invalid_fields_and_batch_sizes_are_rejected_without_writes() {
 }
 
 #[tokio::test]
-async fn listing_uses_explicit_event_and_stable_timestamp_and_id_order() {
+async fn uploads_and_listing_follow_the_active_event() {
     let app = spawn_app().await;
     let game = Game::create(&app).await;
-    let other = Game::create(&app).await;
-    app.activate_new_event().await;
     assert_eq!(
-        game.upload(
+        upload(
             &app,
             vec![
                 game.report(1, 1000),
@@ -487,85 +461,68 @@ async fn listing_uses_explicit_event_and_stable_timestamp_and_id_order() {
         .status(),
         204
     );
-    assert_eq!(
-        other
-            .upload(&app, vec![other.report(4, 3000)])
-            .await
-            .status(),
-        204
-    );
-    let response = app.get(&format!("{}?per_page=2", game.path())).await;
+    let response = app.get("/quickdraw-matches?per_page=2").await;
     let first: Value = assert_json(response, 200).await;
     assert_eq!(first["pagination"], json!({"page": 1, "per_page": 2}));
     assert_eq!(first["matches"][0]["id"], Uuid::from_u128(2).to_string());
     assert_eq!(first["matches"][1]["id"], Uuid::from_u128(3).to_string());
-    let second: Value = app
-        .get(&format!("{}?per_page=2&page=2", game.path()))
-        .await
-        .json()
-        .await
-        .unwrap();
+    let second: Value =
+        assert_json(app.get("/quickdraw-matches?per_page=2&page=2").await, 200).await;
     assert_eq!(second["matches"].as_array().unwrap().len(), 1);
     assert_eq!(second["matches"][0]["id"], Uuid::from_u128(1).to_string());
+    assert_text_error(app.get("/quickdraw-matches?page=invalid").await, 400).await;
+    let original = list(&app).await;
+
+    let other = Game::create(&app).await;
+    assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
+    assert_text_error(upload(&app, vec![game.report(4, 3000)]).await, 400).await;
+    assert_text_error(upload(&app, vec![game.report(1, 1000)]).await, 409).await;
     assert_eq!(
-        other.list(&app).await["matches"].as_array().unwrap().len(),
-        1
+        upload(&app, vec![other.report(5, 3000)]).await.status(),
+        204
     );
-    for id in [Uuid::new_v4().to_string(), "invalid".into()] {
-        let path = format!("/events/{id}/quickdraw-matches");
-        assert_text_error(app.get(&path).await, 404).await;
-        assert_text_error(
-            app.post_protobuf(
-                &path,
-                &WriteQuickdrawMatchesRequest {
-                    matches: vec![game.report(5, 1000)],
-                },
-            )
-            .await,
-            404,
-        )
-        .await;
-    }
+    let other_matches = list(&app).await;
+    assert_eq!(other_matches["matches"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        other_matches["matches"][0]["event_id"],
+        other.event.to_string()
+    );
+
+    sqlx::query("UPDATE app_state SET active_event_id = NULL")
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+    assert_text_error(app.get("/quickdraw-matches").await, 409).await;
+    assert_text_error(upload(&app, vec![game.report(4, 3000)]).await, 409).await;
+    app.select_event(game.event).await;
+    assert_eq!(list(&app).await, original);
+    // Selecting the original event again permits both retries and late results.
+    assert_eq!(
+        upload(&app, vec![game.report(1, 1000), game.report(4, 3000)])
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(list(&app).await["matches"].as_array().unwrap().len(), 4);
+    app.select_event(other.event).await;
+    assert_eq!(list(&app).await, other_matches);
 }
 
 #[tokio::test]
 async fn cross_event_duplicate_ids_conflict_and_do_not_partially_commit() {
     let app = spawn_app().await;
     let game = Game::create(&app).await;
+    assert_eq!(upload(&app, vec![game.report(2, 1000)]).await.status(), 204);
+    let original = list(&app).await;
     let other = Game::create(&app).await;
-    assert_eq!(
-        game.upload(&app, vec![game.report(2, 1000)]).await.status(),
-        204
-    );
     assert_text_error(
-        other
-            .upload(&app, vec![other.report(1, 1000), other.report(2, 1000)])
-            .await,
+        upload(&app, vec![other.report(1, 1000), other.report(2, 1000)]).await,
         409,
     )
     .await;
-    assert!(
-        other.list(&app).await["matches"]
-            .as_array()
-            .unwrap()
-            .is_empty()
-    );
-    // Overlapping concurrent batches in opposite input orders must finish
-    // without deadlock; only one event owns both IDs.
-    let (a, b) = tokio::join!(
-        game.upload(&app, vec![game.report(3, 1000), game.report(4, 1000)]),
-        other.upload(&app, vec![other.report(4, 1000), other.report(3, 1000)]),
-    );
-    let statuses = [a.status().as_u16(), b.status().as_u16()];
-    assert!(statuses == [204, 409] || statuses == [409, 204]);
-    let owners: Vec<Uuid> =
-        sqlx::query_scalar("SELECT DISTINCT event_id FROM quickdraw_matches WHERE id IN ($1, $2)")
-            .bind(Uuid::from_u128(3))
-            .bind(Uuid::from_u128(4))
-            .fetch_all(&app.db_pool)
-            .await
-            .unwrap();
-    assert_eq!(owners.len(), 1);
+    assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
+    app.select_event(game.event).await;
+    assert_eq!(list(&app).await, original);
 }
 
 #[tokio::test]
@@ -586,7 +543,7 @@ async fn ingestion_waits_for_scoring_changes_and_reads_the_committed_period() {
         .await
         .unwrap();
     let request = app
-        .request(Method::POST, &game.path())
+        .request(Method::POST, "/quickdraw-matches")
         .header("Content-Type", "application/protobuf")
         .body(
             WriteQuickdrawMatchesRequest {
@@ -603,7 +560,56 @@ async fn ingestion_waits_for_scoring_changes_and_reads_the_committed_period() {
     transaction.commit().await.unwrap();
     assert_eq!(upload.await.unwrap().status(), 204);
     assert_eq!(
-        game.list(&app).await["matches"][0]["scoring_status"],
+        list(&app).await["matches"][0]["scoring_status"],
         "scoring_disabled"
     );
+}
+
+#[tokio::test]
+async fn event_switch_waits_for_an_upload_to_commit() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let other = Game::create(&app).await;
+    app.select_event(game.event).await;
+    // A scoring change holds the event row. The upload must pin the active
+    // selection while waiting, so a switch cannot redirect its batch.
+    let mut scoring_change = app.db_pool.begin().await.unwrap();
+    sqlx::query("SELECT id FROM events WHERE id = $1 FOR UPDATE")
+        .bind(game.event)
+        .fetch_one(&mut *scoring_change)
+        .await
+        .unwrap();
+    let request = app
+        .request(Method::POST, "/quickdraw-matches")
+        .header("Content-Type", "application/protobuf")
+        .body(
+            WriteQuickdrawMatchesRequest {
+                matches: vec![game.report(1, 1000)],
+            }
+            .encode_to_vec(),
+        );
+    let upload = tokio::spawn(async move { request.send().await.unwrap() });
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let locked: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM pg_locks WHERE relation = 'app_state'::regclass AND mode = 'RowShareLock' AND granted)")
+                .fetch_one(&app.db_pool).await.unwrap();
+            if locked { break; }
+            tokio::task::yield_now().await;
+        }
+    }).await.unwrap();
+    let request = app.request(Method::PUT, &format!("/events/{}/active", other.event));
+    let mut switch = tokio::spawn(async move { request.send().await.unwrap() });
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(100), &mut switch)
+            .await
+            .is_err()
+    );
+    scoring_change.commit().await.unwrap();
+    assert_eq!(upload.await.unwrap().status(), 204);
+    assert_eq!(switch.await.unwrap().status(), 204);
+    assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
+    app.select_event(game.event).await;
+    let saved = list(&app).await;
+    assert_eq!(saved["matches"].as_array().unwrap().len(), 1);
+    assert_eq!(saved["matches"][0]["event_id"], game.event.to_string());
 }

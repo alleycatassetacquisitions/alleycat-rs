@@ -1,3 +1,4 @@
+use crate::events::lock_active_event;
 use crate::routes::errors::database_error;
 use crate::routes::scoring::ScoringState;
 use actix_web::{HttpResponse, error, get, put, web};
@@ -28,7 +29,7 @@ struct GameState {
 
 #[utoipa::path(
     tag = "Game state", summary = "Read current game status",
-    description = "A single database snapshot of the app_state active event, its current scoring period, its delayed-score switch, and UTC server time. With no active event, active_event, scoring, and accepting_delayed_scores are null; time is always present. Use PUT /events/{id}/active to select an event and the event's scoring and delayed-scores routes to change its settings.",
+    description = "A single database snapshot of the app_state active event, its current scoring period, its delayed-score switch, and UTC server time. With no active event, active_event, scoring, and accepting_delayed_scores are null; time is always present. Use PUT /events/{id}/active to select an event and PUT /scoring and PUT /delayed-scores to change its settings.",
     responses((status = 200, description = "Current game status", body = GameState),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
 )]
@@ -48,7 +49,7 @@ pub async fn get_game_state(pool: web::Data<PgPool>) -> actix_web::Result<HttpRe
     )
     .fetch_one(pool.get_ref())
     .await
-    .map_err(|error| database_error(error, "Game state operation failed"))?;
+    .map_err(game_state_error)?;
     let active_event = match (row.id, row.name, row.created_at) {
         (Some(id), Some(name), Some(created_at)) => Some(ActiveEvent {
             id,
@@ -77,29 +78,36 @@ pub struct DelayedScores {
 }
 
 #[utoipa::path(
-    tag = "Game state", summary = "Enable or disable delayed scoring for an event",
-    description = "Reversible switch, initially enabled, independent of the active event and scoring on/off. When disabled, newly received matches from closed scoring periods are saved as delayed_scores_disabled. Matches in the currently open period score normally. Matches outside all periods remain scoring_disabled. Already accepted results never change, including on retries after re-enabling.",
-    params(("event_id" = Uuid, Path, description = "Event ID")),
+    tag = "Game state", summary = "Enable or disable delayed scoring for the active event",
+    description = "Reversible switch for the active event, initially enabled and independent of scoring on/off. Returns 409 when no event is selected. When disabled, newly received matches from closed scoring periods are saved as delayed_scores_disabled. Matches in the currently open period score normally. Matches outside all periods remain scoring_disabled. Already accepted results never change, including on retries after re-enabling.",
     request_body(content = DelayedScores, example = json!({"enabled": false})),
     responses((status = 200, description = "Resulting delayed-score setting", body = DelayedScores),
         (status = 400, description = "Invalid JSON, missing enabled, or unknown fields"),
-        (status = 404, description = "Event not found or invalid event ID"),
+        (status = 409, description = "No active event"),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain"))
 )]
-#[put("/events/{event_id}/delayed-scores")]
+#[put("/delayed-scores")]
 pub async fn set_delayed_scores(
-    event_id: web::Path<Uuid>,
     body: web::Json<DelayedScores>,
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
+    let mut transaction = pool.begin().await.map_err(game_state_error)?;
+    let event_id = lock_active_event(&mut transaction)
+        .await
+        .map_err(game_state_error)?
+        .ok_or_else(|| error::ErrorConflict("No active event"))?;
     // UPDATE takes the same event row lock as scoring changes and ingestion.
     let enabled = sqlx::query_scalar!(
         "UPDATE events SET accepting_delayed_scores = $2 WHERE id = $1 RETURNING accepting_delayed_scores",
-        *event_id, body.enabled
+        event_id, body.enabled
     )
-    .fetch_optional(pool.get_ref())
+    .fetch_one(&mut *transaction)
     .await
-    .map_err(|error| database_error(error, "Game state operation failed"))?
-    .ok_or_else(|| error::ErrorNotFound("Event not found"))?;
+    .map_err(game_state_error)?;
+    transaction.commit().await.map_err(game_state_error)?;
     Ok(HttpResponse::Ok().json(DelayedScores { enabled }))
+}
+
+fn game_state_error(error: sqlx::Error) -> actix_web::Error {
+    database_error(error, "Game state operation failed")
 }

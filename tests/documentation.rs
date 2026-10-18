@@ -235,7 +235,7 @@ async fn player_contract_separates_staff_json_from_device_protobuf_and_patch_nul
 async fn quickdraw_contract_documents_binary_batches_and_scoring_outcomes() {
     let app = DocumentationApp::start().await;
     let spec = app.spec().await;
-    let path = &spec["paths"]["/events/{event_id}/quickdraw-matches"];
+    let path = &spec["paths"]["/quickdraw-matches"];
     let content = &path["post"]["requestBody"]["content"];
     assert_eq!(content.as_object().unwrap().len(), 1);
     assert_eq!(

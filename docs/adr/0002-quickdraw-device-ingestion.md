@@ -1,6 +1,6 @@
 # 0002: Quickdraw device ingestion
 
-- Status: Accepted
+- Status: Partially superseded by [0009](0009-active-event-match-uploads.md) for explicit event targeting and cross-event upload concurrency. Other decisions remain in effect.
 - Date: 2026-10-11
 
 ## Context

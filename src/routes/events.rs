@@ -150,7 +150,7 @@ pub async fn update_event(
 
 #[utoipa::path(
     tag = "Events", summary = "Select the active event",
-    description = "Subsequent player registrations and player listings use this event. An unknown event leaves the current selection unchanged.",
+    description = "Subsequent routine reads and writes use this event. Waits for in-progress writes holding the selection lock to finish. An unknown event leaves the current selection unchanged. Match uploads also use the active selection.",
     params(("id" = Uuid, Path, description = "Event ID")),
     responses((status = 204, description = "Active event selected; empty body"),
         (status = 404, description = "Event not found or invalid event ID"),
@@ -161,7 +161,7 @@ pub async fn set_active_event(
     id: web::Path<Uuid>,
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
-    // Updating the singleton row waits for registrations holding FOR SHARE.
+    // Updating the singleton row waits for writes holding FOR SHARE.
     // An unknown event leaves the previous selection intact.
     let selected = sqlx::query_scalar!(
         "UPDATE app_state SET active_event_id = $1

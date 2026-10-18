@@ -9,10 +9,6 @@ async fn unexpected_constraints_are_not_reported_as_name_conflicts_or_exposed() 
     use reqwest::Method;
 
     let app = spawn_app_with_event().await;
-    let event = alleycat_rs::events::get_active_event_id(&app.db_pool)
-        .await
-        .unwrap()
-        .unwrap();
     // These constraints exist only in this test's isolated database. Their
     // details must stay server-side, unlike the expected name conflicts.
     for statement in [
@@ -22,12 +18,8 @@ async fn unexpected_constraints_are_not_reported_as_name_conflicts_or_exposed() 
         sqlx::query(statement).execute(&app.db_pool).await.unwrap();
     }
     let team_error = assert_text_error(
-        app.request_json(
-            Method::POST,
-            &format!("/events/{event}/teams"),
-            json!({"name": "Rejected"}),
-        )
-        .await,
+        app.request_json(Method::POST, "/teams", json!({"name": "Rejected"}))
+            .await,
         500,
     )
     .await;
