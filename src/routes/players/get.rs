@@ -1,5 +1,5 @@
-use super::PlayerResponse;
-use crate::proto::alleycat::device::DevicePlayerResponse;
+use super::{PlayerAffiliation, PlayerResponse};
+use crate::proto::alleycat::device::{DevicePlayerAffiliation, DevicePlayerResponse};
 use crate::routes::errors::database_error;
 use crate::routes::pagination::{Pagination, PaginationQuery};
 use crate::routes::protobuf::ProtobufBody;
@@ -18,7 +18,7 @@ pub struct GetPlayersResponse {
 
 #[utoipa::path(
     tag = "Players", summary = "List players in the active event",
-    description = "Newest first, including inactive registrations. Returns full player details with email and current team name. Returns an empty list when no event is active.",
+    description = "Newest first, including inactive registrations. Returns full player details with email, current team name, and category/affiliation IDs and names. Returns an empty list when no event is active.",
     params(PaginationQuery),
     responses((status = 200, description = "Players and effective pagination", body = GetPlayersResponse),
         (status = 400, description = "Invalid pagination query"),
@@ -48,20 +48,29 @@ async fn fetch_players(
     pagination: &Pagination,
 ) -> Result<Vec<PlayerResponse>, sqlx::Error> {
     let (limit, offset) = pagination.limit_offset();
-    sqlx::query_as!(
-        PlayerResponse,
+    sqlx::query_as::<_, PlayerResponse>(
         r#"
         SELECT
             p.id, p.event_id, p.pdn_code, p.name, p.email, p.created_at, p.team_id,
-            t.name AS "team_name?", p.active
+            t.name AS team_name, p.active,
+            COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                    'category_id', c.id, 'category_name', c.name,
+                    'affiliation_id', a.id, 'affiliation_name', a.name
+                ) ORDER BY c.name, c.id)
+                FROM player_affiliations pa
+                JOIN affiliation_categories c ON c.id = pa.category_id AND c.event_id = pa.event_id
+                JOIN affiliations a ON a.id = pa.affiliation_id AND a.category_id = pa.category_id AND a.event_id = pa.event_id
+                WHERE pa.player_id = p.id AND pa.event_id = p.event_id
+            ), '[]'::jsonb) AS affiliations
         FROM players p LEFT JOIN teams t ON t.id = p.team_id AND t.event_id = p.event_id
         WHERE p.event_id = (SELECT active_event_id FROM app_state WHERE id = 1)
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT $1 OFFSET $2
         "#,
-        limit,
-        offset
     )
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
     .await
 }
@@ -80,16 +89,25 @@ async fn fetch_player(
     id: Option<Uuid>,
     pin: Option<&str>,
 ) -> actix_web::Result<PlayerResponse> {
-    sqlx::query_as!(
-        PlayerResponse,
+    sqlx::query_as::<_, PlayerResponse>(
         r#"SELECT p.id, p.event_id, p.pdn_code, p.name, p.email, p.created_at, p.team_id,
-                  t.name AS "team_name?", p.active
+                  t.name AS team_name, p.active,
+            COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                    'category_id', c.id, 'category_name', c.name,
+                    'affiliation_id', a.id, 'affiliation_name', a.name
+                ) ORDER BY c.name, c.id)
+                FROM player_affiliations pa
+                JOIN affiliation_categories c ON c.id = pa.category_id AND c.event_id = pa.event_id
+                JOIN affiliations a ON a.id = pa.affiliation_id AND a.category_id = pa.category_id AND a.event_id = pa.event_id
+                WHERE pa.player_id = p.id AND pa.event_id = p.event_id
+            ), '[]'::jsonb) AS affiliations
            FROM players p LEFT JOIN teams t ON t.id = p.team_id AND t.event_id = p.event_id
            WHERE p.event_id = (SELECT active_event_id FROM app_state WHERE id = 1)
              AND (p.id = $1 OR p.pdn_code = $2)"#,
-        id,
-        pin
     )
+    .bind(id)
+    .bind(pin)
     .fetch_optional(pool)
     .await
     .map_err(|error| database_error(error, "Failed to retrieve player"))?
@@ -98,7 +116,7 @@ async fn fetch_player(
 
 #[utoipa::path(
     tag = "Players", summary = "Get a player by UUID",
-    description = "Returns full player details in the active event, including inactive registrations. Returns 404 when no event is active or the player belongs to another event.",
+    description = "Returns full player details in the active event, including inactive registrations and current affiliation assignments. Returns 404 when no event is active or the player belongs to another event.",
     params(("id" = Uuid, Path, description = "Player ID")),
     responses((status = 200, description = "Player details", body = PlayerResponse),
         (status = 404, description = "Player not found in the active event or invalid UUID"),
@@ -114,7 +132,7 @@ pub async fn get_player(
 
 #[utoipa::path(
     tag = "Players", summary = "Get a player by PIN",
-    description = "Looks up the four-digit pdn_code in the active event. Preserve leading zeros. Includes email, team details, and active/inactive status. PINs may repeat across events, so this always uses the active selection.",
+    description = "Looks up the four-digit pdn_code in the active event. Preserve leading zeros. Includes email, team details, active/inactive status, and current affiliation assignments. PINs may repeat across events, so this always uses the active selection.",
     params(("pin" = String, Path, description = "Exactly four ASCII digits, e.g. 0001")),
     responses((status = 200, description = "Player details", body = PlayerResponse),
         (status = 400, description = "Invalid PIN format"),
@@ -132,7 +150,7 @@ pub async fn get_player_by_pin(
 
 #[utoipa::path(
     tag = "Players", summary = "Get device player details by PIN (protobuf)",
-    description = "Returns binary alleycat.device.DevicePlayerResponse from the active event. This separate device message has no email field. Preserve leading zeros in the PIN. Inactive players are returned with active=false so devices can show their status. GET has no request body. See /docs/device-apis#alleycat.device.DevicePlayerResponse for the message contract.",
+    description = "Returns binary alleycat.device.DevicePlayerResponse from the active event. Includes current affiliation assignments with category and affiliation IDs and names. This separate device message has no email field. Preserve leading zeros in the PIN. Inactive players are returned with active=false so devices can show their status. GET has no request body. See /docs/device-apis#alleycat.device.DevicePlayerResponse for the message contract.",
     params(("pin" = String, Path, description = "Exactly four ASCII digits, e.g. 0001")),
     responses((status = 200, description = "Device player details", body = inline(ProtobufBody), content_type = "application/protobuf"),
         (status = 400, description = "Invalid PIN format", body = String, content_type = "text/plain"),
@@ -148,7 +166,17 @@ pub async fn get_device_player_by_pin(
     // Select only device-visible fields; email is never loaded on this path.
     let row = sqlx::query!(
         r#"SELECT p.id, p.event_id, p.pdn_code, p.name, p.created_at, p.team_id,
-                  t.name AS "team_name?", p.active
+                  t.name AS "team_name?", p.active,
+            COALESCE((
+                SELECT jsonb_agg(jsonb_build_object(
+                    'category_id', c.id, 'category_name', c.name,
+                    'affiliation_id', a.id, 'affiliation_name', a.name
+                ) ORDER BY c.name, c.id)
+                FROM player_affiliations pa
+                JOIN affiliation_categories c ON c.id = pa.category_id AND c.event_id = pa.event_id
+                JOIN affiliations a ON a.id = pa.affiliation_id AND a.category_id = pa.category_id AND a.event_id = pa.event_id
+                WHERE pa.player_id = p.id AND pa.event_id = p.event_id
+            ), '[]'::jsonb) AS "affiliations!: sqlx::types::Json<Vec<PlayerAffiliation>>"
            FROM players p LEFT JOIN teams t ON t.id = p.team_id AND t.event_id = p.event_id
            WHERE p.event_id = (SELECT active_event_id FROM app_state WHERE id = 1)
              AND p.pdn_code = $1"#,
@@ -167,6 +195,17 @@ pub async fn get_device_player_by_pin(
         team_id: row.team_id.map(|id| id.to_string()),
         team_name: row.team_name,
         active: row.active,
+        affiliations: row
+            .affiliations
+            .0
+            .into_iter()
+            .map(|assignment| DevicePlayerAffiliation {
+                category_id: assignment.category_id.to_string(),
+                category_name: assignment.category_name,
+                affiliation_id: assignment.affiliation_id.to_string(),
+                affiliation_name: assignment.affiliation_name,
+            })
+            .collect(),
     };
     Ok(HttpResponse::Ok()
         .content_type("application/protobuf")

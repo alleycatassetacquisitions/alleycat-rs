@@ -65,5 +65,6 @@ features = [
     "uuid",
     "chrono",
     "mac_address",
+    "json",
     "migrate"
 ]

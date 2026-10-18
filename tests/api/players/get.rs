@@ -38,6 +38,7 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
     assert_eq!(device.team_id, None);
     assert_eq!(device.team_name, None);
     assert!(device.active);
+    assert!(device.affiliations.is_empty());
     let created: chrono::DateTime<chrono::Utc> =
         first["created_at"].as_str().unwrap().parse().unwrap();
     assert_eq!(device.created_at_unix_ms, created.timestamp_millis());

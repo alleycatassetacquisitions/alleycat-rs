@@ -184,6 +184,10 @@
             <ul>
               
                 <li>
+                  <a href="#alleycat.device.DevicePlayerAffiliation"><span class="badge">M</span>DevicePlayerAffiliation</a>
+                </li>
+              
+                <li>
                   <a href="#alleycat.device.DevicePlayerResponse"><span class="badge">M</span>DevicePlayerResponse</a>
                 </li>
               
@@ -216,6 +220,51 @@
       </div>
       <p></p>
 
+      
+        <h3 id="alleycat.device.DevicePlayerAffiliation">DevicePlayerAffiliation</h3>
+        <p>One current player assignment. Categories and affiliations belong to the</p><p>player's event. Use UUIDs for identity; names may change.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>category_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Category UUID. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>category_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Current category name, such as Allegiance or Faction. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>affiliation_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Affiliation UUID within this category. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>affiliation_name</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Current affiliation name, such as Helix Industries. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
       
         <h3 id="alleycat.device.DevicePlayerResponse">DevicePlayerResponse</h3>
         <p>Response for GET /device/players/by-pin/{pin}, application/protobuf.</p><p>No request body. The path PIN is exactly four ASCII digits, including leading</p><p>zeros, and is resolved in the active event. Invalid PIN format returns 400;</p><p>no active event or no matching player returns 404. Errors are plain text.</p><p>Email is deliberately absent from this device-only response.</p>
@@ -283,6 +332,16 @@
                   <td><p>True for active registrations. Inactive players remain discoverable with
 false; clients should honor this status. It does not rewrite match scores
 or prevent uploads of previously completed matches. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>affiliations</td>
+                  <td><a href="#alleycat.device.DevicePlayerAffiliation">DevicePlayerAffiliation</a></td>
+                  <td>repeated</td>
+                  <td><p>Current assignments in this event, ordered by category name then category UUID.
+At most one affiliation per category. Unassigned categories are omitted;
+an unassigned player has an empty list. Names reflect current renames.
+These are membership details, not permissions or match-time scoring snapshots. </p></td>
                 </tr>
               
             </tbody>

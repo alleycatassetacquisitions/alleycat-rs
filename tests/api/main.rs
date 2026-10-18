@@ -1,3 +1,4 @@
+mod affiliation_routes;
 mod affiliations;
 mod database_errors;
 mod database_timeouts;

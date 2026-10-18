@@ -30,7 +30,7 @@ impl TryFrom<RegisterPlayer> for NewPlayer {
 
 #[utoipa::path(
     tag = "Players", summary = "Register a player in the active event",
-    description = "Creates a player in the active event and allocates a four-digit PDN sequentially, skipping reserved and already assigned codes. New players have no team (team_id is null). Send application/json with name and optional email. Email may be omitted or null.",
+    description = "Creates a player in the active event and allocates a four-digit PDN sequentially, skipping reserved and already assigned codes. New players have no team (team_id is null) and no affiliations (affiliations is an empty array). Send application/json with name and optional email. Email may be omitted or null.",
     request_body(content = RegisterPlayer, content_type = "application/json", example = json!({"name": "Alex", "email": "alex@example.com"})),
     responses((status = 200, description = "Registered player with assigned PIN, email, team details, and status", body = PlayerResponse),
         (status = 400, description = "Invalid JSON or Content-Type, or missing or invalid name or email"),
@@ -124,22 +124,21 @@ async fn insert_player(
     .await?
     .ok_or(RegistrationError::CodesExhausted)?;
 
-    let player = sqlx::query_as!(
-        PlayerResponse,
+    let player = sqlx::query_as::<_, PlayerResponse>(
         r#"WITH inserted AS (
             INSERT INTO players (id, event_id, pdn_code, name, email, created_at)
             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
         )
         SELECT p.id, p.event_id, p.pdn_code, p.name, p.email, p.created_at, p.team_id,
-               t.name AS "team_name?", p.active
+               t.name AS team_name, p.active, '[]'::jsonb AS affiliations
         FROM inserted p LEFT JOIN teams t ON t.id = p.team_id AND t.event_id = p.event_id"#,
-        Uuid::new_v4(),
-        event_id,
-        code,
-        new_player.name.as_ref(),
-        new_player.email.as_ref().map(|email| email.as_ref()),
-        Utc::now()
     )
+    .bind(Uuid::new_v4())
+    .bind(event_id)
+    .bind(&code)
+    .bind(new_player.name.as_ref())
+    .bind(new_player.email.as_ref().map(|email| email.as_ref()))
+    .bind(Utc::now())
     .fetch_one(&mut *transaction)
     .await?;
     sqlx::query!(
