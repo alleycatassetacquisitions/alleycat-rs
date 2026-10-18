@@ -10,6 +10,22 @@ POSTGRES_CONTAINER="${1:?Pass the PostgreSQL service container ID}"
 cargo install sqlx-cli --version 0.8.6 --locked \
     --no-default-features --features rustls,postgres
 
+# Match scripts/init_db.sh's test connection budget. Revisit test-server cleanup
+# if the suite outgrows this limit. max_connections requires a server restart.
+docker exec -i "${POSTGRES_CONTAINER}" psql -X -U postgres -d postgres \
+    -v ON_ERROR_STOP=1 -c 'ALTER SYSTEM SET max_connections = 1000;'
+docker restart "${POSTGRES_CONTAINER}" > /dev/null
+for attempt in {1..30}; do
+    if docker exec "${POSTGRES_CONTAINER}" pg_isready -h 127.0.0.1 -U postgres -d postgres; then
+        break
+    fi
+    if [[ "${attempt}" == 30 ]]; then
+        echo >&2 "PostgreSQL did not become ready after increasing max_connections."
+        exit 1
+    fi
+    sleep 2
+done
+
 # Use the service's client so the runner needs no PostgreSQL package installation.
 docker exec -i "${POSTGRES_CONTAINER}" psql -X -U postgres -d postgres \
     -v ON_ERROR_STOP=1 <<'SQL'

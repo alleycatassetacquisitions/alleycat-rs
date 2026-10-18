@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM player_affiliations WHERE event_id = $1 AND player_id = $2 AND category_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1b2fd8a591ea28c0f78062fab32b9892285f274aa50ed8bc58d56af988a3aa8a"
+}

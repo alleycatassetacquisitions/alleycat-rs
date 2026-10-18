@@ -1,3 +1,4 @@
+mod affiliations;
 mod device_logs;
 mod documentation;
 mod errors;
@@ -23,3 +24,5 @@ pub use quickdraw::*;
 pub use scoring::*;
 pub use teams::*;
 pub use version::*;
+
+pub use affiliations::*;

@@ -1,6 +1,6 @@
 # 0006: Event affiliations
 
-- Status: Accepted
+- Status: Superseded by [0008](0008-device-player-affiliations.md) only for device exposure; other decisions remain in effect.
 - Date: 2026-10-17
 
 ## Context
@@ -41,9 +41,8 @@ Affiliations describe membership only. They don't grant permissions, alter
 scoring, or replace teams. If gameplay roles need concrete rules later, we'll
 design those separately instead of giving special meaning to affiliation names.
 
-The management JSON API will expose these assignments. Device responses stay
-unchanged for now. This record captures the agreed model; API implementation
-follows separately from the schema.
+The management JSON API exposes these assignments. Device responses stay
+unchanged for now.
 
 ## Alternatives considered
 
@@ -67,6 +66,9 @@ Concrete gameplay behavior and device exposure remain separate decisions.
 
 ## References
 
+- [Active-event scope for routine APIs](0007-active-event-api-scope.md)
+- [Catalog API and OpenAPI annotations](../../src/routes/affiliations.rs)
+- [Player assignment API and OpenAPI annotations](../../src/routes/players/update.rs)
 - [Affiliation migration](../../migrations/20261017080000_create_event_affiliations.sql)
 - [Generated database reference](../database/schema/README.md)
 - [Player lifecycle](0004-player-lifecycle-and-device-lookups.md)

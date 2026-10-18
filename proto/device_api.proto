@@ -26,6 +26,24 @@ message DevicePlayerResponse {
   // false; clients should honor this status. It does not rewrite match scores
   // or prevent uploads of previously completed matches.
   bool active = 8;
+  // Current assignments in this event, ordered by category name then category UUID.
+  // At most one affiliation per category. Unassigned categories are omitted;
+  // an unassigned player has an empty list. Names reflect current renames.
+  // These are membership details, not permissions or match-time scoring snapshots.
+  repeated DevicePlayerAffiliation affiliations = 9;
+}
+
+// One current player assignment. Categories and affiliations belong to the
+// player's event. Use UUIDs for identity; names may change.
+message DevicePlayerAffiliation {
+  // Category UUID.
+  string category_id = 1;
+  // Current category name, such as Allegiance or Faction.
+  string category_name = 2;
+  // Affiliation UUID within this category.
+  string affiliation_id = 3;
+  // Current affiliation name, such as Helix Industries.
+  string affiliation_name = 4;
 }
 
 // Request body for POST /device-logs.

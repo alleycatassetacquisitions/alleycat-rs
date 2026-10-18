@@ -213,6 +213,19 @@ async fn player_contract_separates_staff_json_from_device_protobuf_and_patch_nul
             json!(["string", "null"])
         );
     }
+    let changes = &update["properties"]["affiliations"];
+    assert_eq!(changes["type"], "object");
+    assert_eq!(
+        changes["additionalProperties"]["type"],
+        json!(["string", "null"])
+    );
+    assert_eq!(changes["additionalProperties"]["format"], "uuid");
+    assert!(update.get("required").is_none_or(|required| {
+        !required
+            .as_array()
+            .unwrap()
+            .contains(&json!("affiliations"))
+    }));
     for field in ["id", "event_id", "pdn_code", "created_at"] {
         assert!(update["properties"].get(field).is_none());
     }

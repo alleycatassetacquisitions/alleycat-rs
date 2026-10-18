@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO player_affiliations (event_id, player_id, category_id, affiliation_id)\n                 SELECT event_id, $1, category_id, id FROM affiliations\n                 WHERE id = $2 AND event_id = $3 AND category_id = $4\n                 ON CONFLICT (player_id, category_id) DO UPDATE SET affiliation_id = EXCLUDED.affiliation_id\n                 RETURNING affiliation_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "affiliation_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ac41986ced6572a60c1c3599d6704fa67b824d76c1b199c8138fb57ecf5023e3"
+}
