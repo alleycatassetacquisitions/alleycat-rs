@@ -1,6 +1,6 @@
 # 0009: Accept match uploads only for the active event
 
-- Status: Accepted
+- Status: Partially superseded by [0010](0010-partial-match-batch-acceptance.md) for batch atomicity. Other decisions remain in effect.
 - Date: 2026-10-18
 - Supersedes: The explicit-event upload behavior in [0002](0002-quickdraw-device-ingestion.md), [0004](0004-player-lifecycle-and-device-lookups.md), and [0007](0007-active-event-api-scope.md). Their other decisions remain in effect.
 

@@ -1,5 +1,8 @@
 use crate::helpers::{TestApp, assert_json, assert_text_error, spawn_app};
-use alleycat_rs::proto::alleycat::device::{QuickdrawMatch, WriteQuickdrawMatchesRequest};
+use alleycat_rs::proto::alleycat::device::{
+    QuickdrawMatch, QuickdrawMatchErrorCode, QuickdrawMatchRejection, WriteQuickdrawMatchesRequest,
+    WriteQuickdrawMatchesResponse,
+};
 use chrono::{DateTime, Utc};
 use prost::Message;
 use reqwest::Method;
@@ -355,15 +358,29 @@ async fn ingestion_reads_the_delayed_score_setting_after_waiting_for_its_update(
     );
 }
 
+async fn rejections(response: reqwest::Response) -> Vec<QuickdrawMatchRejection> {
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.headers()["content-type"], "application/protobuf");
+    WriteQuickdrawMatchesResponse::decode(response.bytes().await.unwrap())
+        .unwrap()
+        .rejected
+}
+
 #[tokio::test]
-async fn invalid_event_references_roll_back_the_whole_batch() {
+async fn invalid_event_references_are_isolated_and_retries_preserve_accepted_matches() {
     let app = spawn_app().await;
     let game = Game::create(&app).await;
     let other = Game::create(&app).await;
     app.select_event(game.event).await;
+    let fields = [
+        "player_a_id",
+        "player_b_id",
+        "player_a_team_id",
+        "player_b_team_id",
+    ];
+    let mut reports = vec![game.report(10, 1000)];
     for index in 0..4 {
-        let first = game.report(1, 1000);
-        let mut invalid = game.report(2, 1000);
+        let mut invalid = game.report(index + 1, 1000);
         match index {
             0 => invalid.player_a_id = other.players[0].to_string(),
             1 => {
@@ -373,15 +390,89 @@ async fn invalid_event_references_roll_back_the_whole_batch() {
             2 => invalid.player_a_team_id = Some(other.teams[0].to_string()),
             _ => invalid.player_b_team_id = Some(Uuid::new_v4().to_string()),
         }
-        assert_text_error(upload(&app, vec![first, invalid]).await, 400).await;
-        assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
+        reports.push(invalid);
     }
+    reports.push(game.report(11, 1000));
+    let errors = rejections(upload(&app, reports.clone()).await).await;
+    assert_eq!(errors.len(), 4);
+    for (index, error) in errors.iter().enumerate() {
+        assert_eq!(error.match_index, index as u32 + 1);
+        assert_eq!(error.match_id, reports[index + 1].id);
+        assert_eq!(error.fields, vec![fields[index]]);
+        assert_eq!(error.code(), QuickdrawMatchErrorCode::InvalidEventReference);
+    }
+    let saved = list(&app).await;
+    assert_eq!(saved["matches"].as_array().unwrap().len(), 2);
+    assert_eq!(rejections(upload(&app, reports).await).await, errors);
+    assert_eq!(list(&app).await, saved);
+    // Corrected entries can subsequently be accepted under their original IDs.
+    assert_eq!(
+        upload(&app, (1..=4).map(|id| game.report(id, 1000)).collect())
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(list(&app).await["matches"].as_array().unwrap().len(), 6);
 }
 
 #[tokio::test]
-async fn invalid_fields_and_batch_sizes_are_rejected_without_writes() {
+async fn invalid_fields_report_each_entry_and_request_errors_remain_atomic() {
     let app = spawn_app().await;
     let game = Game::create(&app).await;
+    let expected = [
+        (vec!["id"], QuickdrawMatchErrorCode::InvalidUuid),
+        (vec!["player_a_id"], QuickdrawMatchErrorCode::InvalidUuid),
+        (vec!["player_b_id"], QuickdrawMatchErrorCode::InvalidUuid),
+        (
+            vec!["player_a_id", "player_b_id"],
+            QuickdrawMatchErrorCode::SamePlayer,
+        ),
+        (
+            vec!["winner_player_id"],
+            QuickdrawMatchErrorCode::InvalidWinner,
+        ),
+        (
+            vec!["player_a_team_id"],
+            QuickdrawMatchErrorCode::InvalidUuid,
+        ),
+        (
+            vec!["player_b_team_id"],
+            QuickdrawMatchErrorCode::InvalidUuid,
+        ),
+        (
+            vec!["player_a_draw_time_ms"],
+            QuickdrawMatchErrorCode::MissingField,
+        ),
+        (
+            vec!["player_b_draw_time_ms"],
+            QuickdrawMatchErrorCode::MissingField,
+        ),
+        (
+            vec!["player_a_draw_time_ms"],
+            QuickdrawMatchErrorCode::OutOfRange,
+        ),
+        (
+            vec!["player_b_draw_time_ms"],
+            QuickdrawMatchErrorCode::OutOfRange,
+        ),
+        (
+            vec!["occurred_at_unix_ms"],
+            QuickdrawMatchErrorCode::MissingField,
+        ),
+        (
+            vec!["occurred_at_unix_ms"],
+            QuickdrawMatchErrorCode::OutOfRange,
+        ),
+        (
+            vec!["occurred_at_unix_ms"],
+            QuickdrawMatchErrorCode::OutOfRange,
+        ),
+        (
+            vec!["winner_player_id"],
+            QuickdrawMatchErrorCode::InvalidUuid,
+        ),
+    ];
+    let mut reports = Vec::new();
     for index in 0..15 {
         let mut report = game.report(1, 1000);
         match index {
@@ -401,7 +492,15 @@ async fn invalid_fields_and_batch_sizes_are_rejected_without_writes() {
             13 => report.occurred_at_unix_ms = Some(i64::MAX),
             _ => report.winner_player_id.clear(),
         }
-        assert_text_error(upload(&app, vec![report]).await, 400).await;
+        reports.push(report);
+    }
+    let errors = rejections(upload(&app, reports.clone()).await).await;
+    assert_eq!(errors.len(), expected.len());
+    for (index, (error, (fields, code))) in errors.iter().zip(expected).enumerate() {
+        assert_eq!(error.match_index, index as u32);
+        assert_eq!(error.match_id, reports[index].id);
+        assert_eq!(error.fields, fields);
+        assert_eq!(error.code(), code);
     }
     for size in [0, 101] {
         assert_text_error(upload(&app, vec![game.report(1, 1000); size]).await, 400).await;
@@ -475,7 +574,12 @@ async fn uploads_and_listing_follow_the_active_event() {
 
     let other = Game::create(&app).await;
     assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
-    assert_text_error(upload(&app, vec![game.report(4, 3000)]).await, 400).await;
+    let rejected = rejections(upload(&app, vec![game.report(4, 3000)]).await).await;
+    assert_eq!(rejected.len(), 1);
+    assert_eq!(
+        rejected[0].code(),
+        QuickdrawMatchErrorCode::InvalidEventReference
+    );
     assert_text_error(upload(&app, vec![game.report(1, 1000)]).await, 409).await;
     assert_eq!(
         upload(&app, vec![other.report(5, 3000)]).await.status(),
@@ -612,4 +716,80 @@ async fn event_switch_waits_for_an_upload_to_commit() {
     let saved = list(&app).await;
     assert_eq!(saved["matches"].as_array().unwrap().len(), 1);
     assert_eq!(saved["matches"][0]["event_id"], game.event.to_string());
+}
+
+#[tokio::test]
+async fn mixed_errors_and_duplicate_ids_are_correlated_by_request_index() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let mut malformed = game.report(1, 1000);
+    malformed.player_a_id.clear();
+    malformed.player_b_draw_time_ms = None; // Only the first error is returned.
+    let mut unknown_team = game.report(2, 1000);
+    unknown_team.player_b_team_id = Some(Uuid::new_v4().to_string());
+    let mut duplicate = game.report(1, 2000);
+    duplicate.player_a_draw_time_ms = Some(999);
+    let errors = rejections(
+        upload(
+            &app,
+            vec![
+                malformed,
+                game.report(1, 1000),
+                unknown_team,
+                duplicate,
+                game.report(3, 1000),
+            ],
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(errors.len(), 2);
+    assert_eq!(errors[0].match_index, 0);
+    assert_eq!(errors[0].fields, vec!["player_a_id"]);
+    assert_eq!(errors[1].match_index, 2);
+    assert_eq!(errors[1].fields, vec!["player_b_team_id"]);
+    let saved = list(&app).await;
+    assert_eq!(saved["matches"].as_array().unwrap().len(), 2);
+    let first = saved["matches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["id"] == Uuid::from_u128(1).to_string())
+        .unwrap();
+    assert_eq!(first["player_a_draw_time_ms"], 0);
+}
+
+#[tokio::test]
+async fn cross_event_id_conflicts_take_precedence_over_invalid_fields() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    assert_eq!(upload(&app, vec![game.report(1, 1000)]).await.status(), 204);
+    let other = Game::create(&app).await;
+    let mut conflict = other.report(1, 1000);
+    conflict.player_a_id.clear();
+    assert_text_error(
+        upload(&app, vec![other.report(2, 1000), conflict]).await,
+        409,
+    )
+    .await;
+    assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn unexpected_database_failure_rolls_back_otherwise_accepted_entries() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    sqlx::query("ALTER TABLE quickdraw_matches ADD CONSTRAINT private_failure CHECK (player_a_draw_time_ms <> 42)")
+        .execute(&app.db_pool).await.unwrap();
+    let mut invalid = game.report(2, 1000);
+    invalid.player_a_team_id = Some(Uuid::new_v4().to_string());
+    let mut broken = game.report(3, 1000);
+    broken.player_a_draw_time_ms = Some(42);
+    let body = assert_text_error(
+        upload(&app, vec![game.report(1, 1000), invalid, broken]).await,
+        500,
+    )
+    .await;
+    assert!(!body.contains("private_failure"));
+    assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
 }

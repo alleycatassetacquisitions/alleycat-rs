@@ -1,5 +1,8 @@
 use crate::events::{get_active_event_id, lock_active_event};
-use crate::proto::alleycat::device::{QuickdrawMatch, WriteQuickdrawMatchesRequest};
+use crate::proto::alleycat::device::{
+    QuickdrawMatch, QuickdrawMatchErrorCode, QuickdrawMatchRejection, WriteQuickdrawMatchesRequest,
+    WriteQuickdrawMatchesResponse,
+};
 use crate::routes::{
     errors::database_error,
     pagination::{Pagination, PaginationQuery},
@@ -7,8 +10,9 @@ use crate::routes::{
 };
 use actix_web::{HttpRequest, HttpResponse, error, get, post, web};
 use chrono::{DateTime, Utc};
+use prost::Message;
 use serde::Serialize;
-use sqlx::PgPool;
+use sqlx::{Acquire, PgPool};
 use uuid::Uuid;
 
 struct NewMatch {
@@ -23,17 +27,44 @@ struct NewMatch {
     occurred_at: DateTime<Utc>,
 }
 
-fn parse_id(value: &str, field: &str) -> Result<Uuid, String> {
-    Uuid::parse_str(value).map_err(|_| format!("{field} must be a UUID"))
+struct MatchValidationError {
+    fields: Vec<String>,
+    code: QuickdrawMatchErrorCode,
 }
 
-fn draw_time(value: Option<u64>, field: &str) -> Result<i64, String> {
-    i64::try_from(value.ok_or_else(|| format!("{field} is required"))?)
-        .map_err(|_| format!("{field} must fit a signed 64-bit integer"))
+impl MatchValidationError {
+    fn new(fields: &[&str], code: QuickdrawMatchErrorCode) -> Self {
+        Self {
+            fields: fields.iter().map(|field| (*field).to_owned()).collect(),
+            code,
+        }
+    }
+
+    fn rejection(self, index: usize, match_id: String) -> QuickdrawMatchRejection {
+        QuickdrawMatchRejection {
+            match_index: index as u32,
+            match_id,
+            fields: self.fields,
+            code: self.code.into(),
+        }
+    }
+}
+
+fn parse_id(value: &str, field: &str) -> Result<Uuid, MatchValidationError> {
+    Uuid::parse_str(value)
+        .map_err(|_| MatchValidationError::new(&[field], QuickdrawMatchErrorCode::InvalidUuid))
+}
+
+fn draw_time(value: Option<u64>, field: &str) -> Result<i64, MatchValidationError> {
+    let value = value.ok_or_else(|| {
+        MatchValidationError::new(&[field], QuickdrawMatchErrorCode::MissingField)
+    })?;
+    i64::try_from(value)
+        .map_err(|_| MatchValidationError::new(&[field], QuickdrawMatchErrorCode::OutOfRange))
 }
 
 impl TryFrom<QuickdrawMatch> for NewMatch {
-    type Error = String;
+    type Error = MatchValidationError;
 
     fn try_from(value: QuickdrawMatch) -> Result<Self, Self::Error> {
         let id = parse_id(&value.id, "id")?;
@@ -41,15 +72,32 @@ impl TryFrom<QuickdrawMatch> for NewMatch {
         let player_b_id = parse_id(&value.player_b_id, "player_b_id")?;
         let winner_player_id = parse_id(&value.winner_player_id, "winner_player_id")?;
         if player_a_id == player_b_id {
-            return Err("Players must be distinct".into());
+            return Err(MatchValidationError::new(
+                &["player_a_id", "player_b_id"],
+                QuickdrawMatchErrorCode::SamePlayer,
+            ));
         }
         if winner_player_id != player_a_id && winner_player_id != player_b_id {
-            return Err("Winner must be a participant".into());
+            return Err(MatchValidationError::new(
+                &["winner_player_id"],
+                QuickdrawMatchErrorCode::InvalidWinner,
+            ));
         }
-        let occurred_at = value.occurred_at_unix_ms
+        let occurred_at_ms = value.occurred_at_unix_ms.ok_or_else(|| {
+            MatchValidationError::new(
+                &["occurred_at_unix_ms"],
+                QuickdrawMatchErrorCode::MissingField,
+            )
+        })?;
+        let occurred_at = Some(occurred_at_ms)
             .filter(|ms| (0..=253_402_300_799_999).contains(ms))
             .and_then(DateTime::from_timestamp_millis)
-            .ok_or("occurred_at_unix_ms is required and must be UTC milliseconds from 1970 through 9999")?;
+            .ok_or_else(|| {
+                MatchValidationError::new(
+                    &["occurred_at_unix_ms"],
+                    QuickdrawMatchErrorCode::OutOfRange,
+                )
+            })?;
         Ok(Self {
             id,
             player_a_id,
@@ -73,15 +121,21 @@ impl TryFrom<QuickdrawMatch> for NewMatch {
 }
 
 fn match_error(error: sqlx::Error) -> actix_web::Error {
-    match error.as_database_error().and_then(|e| e.constraint()) {
-        Some(
-            "quickdraw_matches_player_a_fkey"
-            | "quickdraw_matches_player_b_fkey"
-            | "quickdraw_matches_team_a_fkey"
-            | "quickdraw_matches_team_b_fkey",
-        ) => error::ErrorBadRequest("Match players and teams must belong to the active event"),
-        _ => database_error(error, "Quickdraw operation failed"),
-    }
+    database_error(error, "Quickdraw operation failed")
+}
+
+fn reference_error(error: &sqlx::Error) -> Option<MatchValidationError> {
+    let field = match error.as_database_error().and_then(|e| e.constraint()) {
+        Some("quickdraw_matches_player_a_fkey") => "player_a_id",
+        Some("quickdraw_matches_player_b_fkey") => "player_b_id",
+        Some("quickdraw_matches_team_a_fkey") => "player_a_team_id",
+        Some("quickdraw_matches_team_b_fkey") => "player_b_team_id",
+        _ => return None,
+    };
+    Some(MatchValidationError::new(
+        &[field],
+        QuickdrawMatchErrorCode::InvalidEventReference,
+    ))
 }
 
 #[utoipa::path(
@@ -90,7 +144,7 @@ fn match_error(error: sqlx::Error) -> actix_web::Error {
 Use the [protobuf definition](/docs/device_api.proto) to generate your client messages.
 Supply **1–100 matches**, with a maximum request body of **256 KiB**.
 Uses the active event and holds that selection until the batch commits. Returns 409 when no event is selected.
-After an event switch, uploads for the previous event are rejected; select that event again before retrying.
+After an event switch, references to previous-event players or teams are rejected per match; select that event again before retrying.
 
 See [Device APIs: WriteQuickdrawMatchesRequest](/docs/device-apis#alleycat.device.WriteQuickdrawMatchesRequest)
 for message fields, protobuf types, and validation requirements.
@@ -104,18 +158,23 @@ for message fields, protobuf types, and validation requirements.
   outside a scoring period, closed period with delayed scores disabled, unassigned team,
   same team, otherwise scoring. The delayed-score switch never changes saved results.
 
-### Atomicity and duplicate reports
+### Partial acceptance and duplicate reports
 
-- The batch is atomic: failures save none of its matches.
+- Valid matches commit together; invalid matches return one field-level rejection per entry.
+- 204 means all entries were accepted. 200 returns binary
+  [WriteQuickdrawMatchesResponse](/docs/device-apis#alleycat.device.WriteQuickdrawMatchesResponse),
+  including when every entry was rejected. Entries not listed were saved or already stored.
+- Request-wide errors and unexpected database failures save no new matches.
 - Valid duplicate reports in the same event succeed without changing stored fields,
   including receipt time and scoring.
-- For repeated IDs within a batch, the first occurrence wins.
+- For repeated IDs within a batch, the first accepted occurrence wins; rejections identify request indices.
 - An ID already stored in another event rejects the batch.
 "##,
     request_body(content = inline(ProtobufBody), content_type = "application/protobuf"),
     responses(
         (status = 204, description = "Entire batch accepted or already stored; empty body"),
-        (status = 400, description = "Invalid protobuf, batch size, fields, or event references", body = String, content_type = "text/plain"),
+        (status = 200, description = "Batch processed; protobuf identifies rejected entries, all other entries accepted", body = inline(ProtobufBody), content_type = "application/protobuf"),
+        (status = 400, description = "Invalid protobuf or batch size; no matches saved", body = String, content_type = "text/plain"),
         (status = 409, description = "No active event or match ID belongs to another event; batch rejected", body = String, content_type = "text/plain"),
         (status = 413, description = "Request body exceeds 256 KiB"),
         (status = 415, description = "Expected application/protobuf"),
@@ -132,15 +191,14 @@ pub async fn write_quickdraw_matches(
     if !(1..=100).contains(&batch.matches.len()) {
         return Err(error::ErrorBadRequest("Supply 1–100 matches"));
     }
-    let matches = batch
+    // Check ownership even for reports with other invalid fields. A known
+    // cross-event match ID remains a request-wide configuration failure.
+    let ids: Vec<Uuid> = batch
         .matches
-        .into_iter()
-        .enumerate()
-        .map(|(index, report)| {
-            NewMatch::try_from(report)
-                .map_err(|message| error::ErrorBadRequest(format!("matches[{index}]: {message}")))
-        })
-        .collect::<actix_web::Result<Vec<_>>>()?;
+        .iter()
+        .filter_map(|report| Uuid::parse_str(&report.id).ok())
+        .collect();
+    let mut rejected = Vec::new();
     let mut transaction = pool.begin().await.map_err(match_error)?;
     let event_id = lock_active_event(&mut transaction)
         .await
@@ -152,7 +210,32 @@ pub async fn write_quickdraw_matches(
         .fetch_one(&mut *transaction)
         .await
         .map_err(match_error)?;
-    for report in matches {
+    let conflicting_id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM quickdraw_matches WHERE id = ANY($1) AND event_id <> $2 LIMIT 1",
+    )
+    .bind(&ids)
+    .bind(event_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(match_error)?;
+    if conflicting_id.is_some() {
+        return Err(error::ErrorConflict(
+            "Match ID already belongs to another event",
+        ));
+    }
+    for (index, raw_report) in batch.matches.into_iter().enumerate() {
+        let match_id = raw_report.id.clone();
+        let report = match NewMatch::try_from(raw_report) {
+            Ok(report) => report,
+            Err(error) => {
+                rejected.push(error.rejection(index, match_id));
+                continue;
+            }
+        };
+        // PostgreSQL aborts a transaction after a constraint violation. A
+        // savepoint isolates expected reference failures from valid matches.
+        let mut entry = transaction.begin().await.map_err(match_error)?;
+
         let inserted = sqlx::query!(
             "INSERT INTO quickdraw_matches
              (id, event_id, player_a_id, player_b_id, player_a_team_id, player_b_team_id,
@@ -175,7 +258,18 @@ pub async fn write_quickdraw_matches(
             report.player_a_team_id, report.player_b_team_id,
             report.player_a_draw_time_ms, report.player_b_draw_time_ms,
             report.winner_player_id, report.occurred_at,
-        ).execute(&mut *transaction).await.map_err(match_error)?;
+        ).execute(&mut *entry).await;
+        let inserted = match inserted {
+            Ok(inserted) => inserted,
+            Err(error) => {
+                if let Some(validation) = reference_error(&error) {
+                    entry.rollback().await.map_err(match_error)?;
+                    rejected.push(validation.rejection(index, match_id));
+                    continue;
+                }
+                return Err(match_error(error));
+            }
+        };
         if inserted.rows_affected() == 0 {
             // Retries must belong to the current event too, even though the
             // duplicate insert leaves the original record untouched.
@@ -183,7 +277,7 @@ pub async fn write_quickdraw_matches(
                 "SELECT event_id FROM quickdraw_matches WHERE id = $1",
                 report.id
             )
-            .fetch_one(&mut *transaction)
+            .fetch_one(&mut *entry)
             .await
             .map_err(match_error)?;
             if owner != event_id {
@@ -192,9 +286,16 @@ pub async fn write_quickdraw_matches(
                 ));
             }
         }
+        entry.commit().await.map_err(match_error)?;
     }
     transaction.commit().await.map_err(match_error)?;
-    Ok(HttpResponse::NoContent().finish())
+    if rejected.is_empty() {
+        Ok(HttpResponse::NoContent().finish())
+    } else {
+        Ok(HttpResponse::Ok()
+            .content_type("application/protobuf")
+            .body(WriteQuickdrawMatchesResponse { rejected }.encode_to_vec()))
+    }
 }
 
 #[derive(Serialize, sqlx::Type, utoipa::ToSchema)]
