@@ -1,6 +1,6 @@
 # 0007: Use the active event for routine API operations
 
-- Status: Accepted
+- Status: Partially superseded by [0009](0009-active-event-match-uploads.md) for the explicit-event exception for match uploads. Other decisions remain in effect.
 - Date: 2026-10-18
 
 ## Context
@@ -66,6 +66,14 @@ Match ingestion and event management retain their explicit targeting.
 This decision extends ADR 0004's active-event behavior to routine operations;
 it does not replace the affiliation model or the delayed-upload decision.
 
+## Implementation follow-up
+
+As of 2026-10-18, the remaining routine routes also use the active event. The
+follow-up covers teams, scoring controls, the delayed-score setting, and match
+listing. [ADR 0009](0009-active-event-match-uploads.md) also brings match uploads
+under the active selection, leaving event management as the only exception. See
+the route annotations below for the current contracts.
+
 ## References
 
 - [Player lifecycle and event-selection locking](0004-player-lifecycle-and-device-lookups.md)
@@ -73,3 +81,7 @@ it does not replace the affiliation model or the delayed-upload decision.
 - [Event affiliations](0006-event-affiliations.md)
 - [Affiliation routes and OpenAPI](../../src/routes/affiliations.rs)
 - [Active-event helpers](../../src/events.rs)
+- [Team routes and OpenAPI](../../src/routes/teams.rs)
+- [Scoring controls and OpenAPI](../../src/routes/scoring.rs)
+- [Game state and delayed-score control](../../src/routes/game_state.rs)
+- [Match listing and ingestion](../../src/routes/quickdraw.rs)

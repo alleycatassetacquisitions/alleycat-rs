@@ -1,3 +1,4 @@
+use crate::events::{get_active_event_id, lock_active_event};
 use crate::routes::errors;
 use actix_web::{HttpResponse, error, get, patch, post, web};
 use serde::{Deserialize, Serialize};
@@ -38,64 +39,70 @@ fn database_error(error: sqlx::Error) -> actix_web::Error {
 }
 
 #[utoipa::path(
-    tag = "Teams", summary = "Create a team in an event",
-    description = "Uses the explicit event, not the active event. Names follow the TeamName rules. Creates no player memberships.",
-    params(("event_id" = Uuid, Path, description = "Event ID")),
+    tag = "Teams", summary = "Create a team in the active event",
+    description = "Uses the active event; returns 409 when none is selected. Names follow the TeamName rules. Creates no player memberships.",
     request_body(content = TeamName, example = json!({"name": "Runners"})),
     responses(
         (status = 201, description = "Team created", body = TeamResponse),
         (status = 400, description = "Invalid JSON, unknown fields, or invalid name"),
-        (status = 404, description = "Event not found or invalid event ID"),
-        (status = 409, description = "Name already exists in this event"),
+        (status = 409, description = "No active event or name already exists in this event"),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain")
     )
 )]
-#[post("/events/{event_id}/teams")]
+#[post("/teams")]
 pub async fn create_team(
-    event_id: web::Path<Uuid>,
     body: web::Json<TeamName>,
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
     validate_name(&body.name)?;
+    let mut transaction = pool.begin().await.map_err(database_error)?;
+    let event_id = lock_active_event(&mut transaction)
+        .await
+        .map_err(database_error)?
+        .ok_or_else(|| error::ErrorConflict("No active event"))?;
     let team = sqlx::query_as!(
         TeamResponse,
         "INSERT INTO teams (event_id, name)
          SELECT id, $2 FROM events WHERE id = $1
          RETURNING id, event_id, name",
-        *event_id,
+        event_id,
         body.name.trim()
     )
-    .fetch_optional(pool.get_ref())
+    .fetch_one(&mut *transaction)
     .await
-    .map_err(database_error)?
-    .ok_or_else(|| error::ErrorNotFound("Event not found"))?;
+    .map_err(database_error)?;
+    transaction.commit().await.map_err(database_error)?;
     Ok(HttpResponse::Created().json(team))
 }
 
 #[utoipa::path(
     tag = "Teams", summary = "Rename a team",
-    description = "Requires name, following the TeamName rules. The team must belong to the specified event. Preserves its ID and memberships; renaming to its current name succeeds.",
+    description = "Requires name, following the TeamName rules. The team must belong to the active event; returns 409 when no event is selected. Preserves its ID and memberships; renaming to its current name succeeds.",
     params(
-        ("event_id" = Uuid, Path, description = "Event ID"),
         ("id" = Uuid, Path, description = "Team ID")
     ),
     request_body(content = TeamName, example = json!({"name": "Runners"})),
     responses(
         (status = 200, description = "Renamed team", body = TeamResponse),
         (status = 400, description = "Invalid JSON, unknown fields, or invalid name"),
-        (status = 404, description = "Team not found in this event or invalid ID"),
-        (status = 409, description = "Name already exists in this event"),
+        (status = 404, description = "Team not found in the active event or invalid ID"),
+        (status = 409, description = "No active event or name already exists in this event"),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain")
     )
 )]
-#[patch("/events/{event_id}/teams/{id}")]
+#[patch("/teams/{id}")]
 pub async fn rename_team(
-    path: web::Path<(Uuid, Uuid)>,
+    path: web::Path<Uuid>,
     body: web::Json<TeamName>,
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
     validate_name(&body.name)?;
-    let (event_id, id) = path.into_inner();
+    let id = *path;
+    let mut transaction = pool.begin().await.map_err(database_error)?;
+    let event_id = lock_active_event(&mut transaction)
+        .await
+        .map_err(database_error)?
+        .ok_or_else(|| error::ErrorConflict("No active event"))?;
     let team = sqlx::query_as!(
         TeamResponse,
         "UPDATE teams SET name = $3 WHERE event_id = $1 AND id = $2
@@ -104,43 +111,33 @@ pub async fn rename_team(
         id,
         body.name.trim()
     )
-    .fetch_optional(pool.get_ref())
+    .fetch_optional(&mut *transaction)
     .await
     .map_err(database_error)?
     .ok_or_else(|| error::ErrorNotFound("Team not found in this event"))?;
+    transaction.commit().await.map_err(database_error)?;
     Ok(HttpResponse::Ok().json(team))
 }
 
 #[utoipa::path(
-    tag = "Teams", summary = "List teams in an event",
-    description = "Returns all teams ordered by name, then ID. Uses the explicit event regardless of the active selection. New events have no teams.",
-    params(("event_id" = Uuid, Path, description = "Event ID")),
+    tag = "Teams", summary = "List teams in the active event",
+    description = "Returns all teams ordered by name, then ID. Uses the active event; returns 409 when none is selected. New events have no teams.",
     responses(
         (status = 200, description = "Event teams", body = Vec<TeamResponse>),
-        (status = 404, description = "Event not found or invalid event ID"),
+        (status = 409, description = "No active event"),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain")
     )
 )]
-#[get("/events/{event_id}/teams")]
-pub async fn list_teams(
-    event_id: web::Path<Uuid>,
-    pool: web::Data<PgPool>,
-) -> actix_web::Result<HttpResponse> {
-    // EXISTS always returns a non-null boolean, even when no event matches.
-    let exists = sqlx::query_scalar!(
-        r#"SELECT EXISTS (SELECT 1 FROM events WHERE id = $1) AS "exists!""#,
-        *event_id
-    )
-    .fetch_one(pool.get_ref())
-    .await
-    .map_err(database_error)?;
-    if !exists {
-        return Err(error::ErrorNotFound("Event not found"));
-    }
+#[get("/teams")]
+pub async fn list_teams(pool: web::Data<PgPool>) -> actix_web::Result<HttpResponse> {
+    let event_id = get_active_event_id(pool.get_ref())
+        .await
+        .map_err(database_error)?
+        .ok_or_else(|| error::ErrorConflict("No active event"))?;
     let teams = sqlx::query_as!(
         TeamResponse,
         "SELECT id, event_id, name FROM teams WHERE event_id = $1 ORDER BY name, id",
-        *event_id
+        event_id
     )
     .fetch_all(pool.get_ref())
     .await

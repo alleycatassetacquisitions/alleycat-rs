@@ -2,7 +2,6 @@ use crate::helpers::{assert_json, assert_text_error, spawn_app};
 use chrono::{DateTime, Utc};
 use reqwest::Method;
 use serde_json::{Value, json};
-use uuid::Uuid;
 
 #[tokio::test]
 async fn game_state_without_an_active_event_returns_null_settings_and_utc_time() {
@@ -48,17 +47,13 @@ async fn game_state_tracks_the_active_event_and_its_independent_settings() {
     assert_eq!(state["accepting_delayed_scores"], true);
 
     let response = app
-        .request_json(
-            Method::PUT,
-            &format!("/events/{id}/scoring"),
-            json!({"enabled": true}),
-        )
+        .request_json(Method::PUT, "/scoring", json!({"enabled": true}))
         .await;
     let scoring: Value = assert_json(response, 200).await;
-    let delayed = format!("/events/{id}/delayed-scores");
+    let delayed = "/delayed-scores";
     for _ in 0..2 {
         let response = app
-            .request_json(Method::PUT, &delayed, json!({"enabled": false}))
+            .request_json(Method::PUT, delayed, json!({"enabled": false}))
             .await;
         let setting: Value = assert_json(response, 200).await;
         assert_eq!(setting, json!({"enabled": false}));
@@ -74,13 +69,16 @@ async fn game_state_tracks_the_active_event_and_its_independent_settings() {
     assert_eq!(state["active_event"]["id"], second.to_string());
     assert_eq!(state["scoring"]["enabled"], false);
     assert_eq!(state["accepting_delayed_scores"], true);
-    // An explicit-event update neither switches the active event nor its setting.
-    assert_eq!(
-        app.request_json(Method::PUT, &delayed, json!({"enabled": true}))
-            .await
-            .status(),
-        200
-    );
+    // Changing the second event leaves the first event's settings intact.
+    for enabled in [false, true] {
+        let response = app
+            .request_json(Method::PUT, delayed, json!({"enabled": enabled}))
+            .await;
+        assert_eq!(
+            assert_json::<Value>(response, 200).await,
+            json!({"enabled": enabled})
+        );
+    }
     let response = app
         .request(Method::PUT, &format!("/events/{id}/active"))
         .send()
@@ -91,35 +89,37 @@ async fn game_state_tracks_the_active_event_and_its_independent_settings() {
     let state: Value = assert_json(response, 200).await;
     assert_eq!(state["active_event"], first);
     assert_eq!(state["scoring"], scoring);
-    assert_eq!(state["accepting_delayed_scores"], true);
+    assert_eq!(state["accepting_delayed_scores"], false);
 }
 
 #[tokio::test]
-async fn delayed_score_settings_validate_requests_and_missing_events() {
+async fn delayed_score_settings_validate_requests_and_require_an_active_event() {
     let app = spawn_app().await;
     let event = app.activate_new_event().await;
-    let path = format!("/events/{event}/delayed-scores");
+    let path = "/delayed-scores";
     for body in [
         json!({}),
         json!({"enabled": null}),
         json!({"enabled": "false"}),
         json!({"enabled": false, "finalize": true}),
+        json!({"enabled": false, "event_id": event}),
     ] {
         assert_eq!(
-            app.request_json(Method::PUT, &path, body).await.status(),
+            app.request_json(Method::PUT, path, body).await.status(),
             400
         );
     }
+    sqlx::query("UPDATE app_state SET active_event_id = NULL")
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
     assert_text_error(
-        app.request_json(
-            Method::PUT,
-            &format!("/events/{}/delayed-scores", Uuid::new_v4()),
-            json!({"enabled": false}),
-        )
-        .await,
-        404,
+        app.request_json(Method::PUT, path, json!({"enabled": false}))
+            .await,
+        409,
     )
     .await;
+    app.select_event(event).await;
     let response = app.get("/game-state").await;
     let state: Value = assert_json(response, 200).await;
     assert_eq!(state["accepting_delayed_scores"], true);

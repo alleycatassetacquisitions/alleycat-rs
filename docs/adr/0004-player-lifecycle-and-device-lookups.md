@@ -1,6 +1,6 @@
 # 0004: Player lifecycle and device lookups
 
-- Status: Accepted
+- Status: Partially superseded by [0009](0009-active-event-match-uploads.md) for accepting uploads after an event switch. Other decisions remain in effect.
 - Date: 2026-10-15
 
 ## Context

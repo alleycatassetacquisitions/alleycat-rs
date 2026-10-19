@@ -80,8 +80,14 @@ message WriteDeviceLogRequest {
   optional string task_name = 8;
 }
 
-// POST /events/{event_id}/quickdraw-matches, application/protobuf.
-// Send 1-100 completed matches for the explicit event. The batch is atomic:
+// POST /quickdraw-matches, application/protobuf.
+// Send 1-100 completed matches for the currently active event. The server holds
+// that selection until the batch commits. No active event returns 409.
+// New matches must reference players and teams in the active event (400 otherwise).
+// A match ID already stored in another event returns 409, including on retries.
+// After an event switch, old-event uploads are rejected; they can be retried if
+// that event is selected again. Scoring still uses match time and the event's
+// delayed-score setting. Errors are plain text. The batch is atomic:
 // 204 means every result was saved or already existed; failures save none.
 message WriteQuickdrawMatchesRequest {
   // Required batch of 1-100 completed matches. Maximum encoded request body: 256 KiB.

@@ -1,3 +1,4 @@
+use crate::events::{get_active_event_id, lock_active_event};
 use crate::proto::alleycat::device::{QuickdrawMatch, WriteQuickdrawMatchesRequest};
 use crate::routes::{
     errors::database_error,
@@ -78,7 +79,7 @@ fn match_error(error: sqlx::Error) -> actix_web::Error {
             | "quickdraw_matches_player_b_fkey"
             | "quickdraw_matches_team_a_fkey"
             | "quickdraw_matches_team_b_fkey",
-        ) => error::ErrorBadRequest("Match players and teams must belong to the specified event"),
+        ) => error::ErrorBadRequest("Match players and teams must belong to the active event"),
         _ => database_error(error, "Quickdraw operation failed"),
     }
 }
@@ -88,7 +89,8 @@ fn match_error(error: sqlx::Error) -> actix_web::Error {
     description = r##"Send `alleycat.device.WriteQuickdrawMatchesRequest` encoded as binary protobuf.
 Use the [protobuf definition](/docs/device_api.proto) to generate your client messages.
 Supply **1–100 matches**, with a maximum request body of **256 KiB**.
-Uses the explicit event, regardless of active selection.
+Uses the active event and holds that selection until the batch commits. Returns 409 when no event is selected.
+After an event switch, uploads for the previous event are rejected; select that event again before retrying.
 
 See [Device APIs: WriteQuickdrawMatchesRequest](/docs/device-apis#alleycat.device.WriteQuickdrawMatchesRequest)
 for message fields, protobuf types, and validation requirements.
@@ -110,21 +112,18 @@ for message fields, protobuf types, and validation requirements.
 - For repeated IDs within a batch, the first occurrence wins.
 - An ID already stored in another event rejects the batch.
 "##,
-    params(("event_id" = Uuid, Path, description = "Event ID")),
     request_body(content = inline(ProtobufBody), content_type = "application/protobuf"),
     responses(
         (status = 204, description = "Entire batch accepted or already stored; empty body"),
         (status = 400, description = "Invalid protobuf, batch size, fields, or event references", body = String, content_type = "text/plain"),
-        (status = 404, description = "Event not found or invalid event ID"),
-        (status = 409, description = "Match ID belongs to another event; batch rejected", body = String, content_type = "text/plain"),
+        (status = 409, description = "No active event or match ID belongs to another event; batch rejected", body = String, content_type = "text/plain"),
         (status = 413, description = "Request body exceeds 256 KiB"),
         (status = 415, description = "Expected application/protobuf"),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain")
     )
 )]
-#[post("/events/{event_id}/quickdraw-matches")]
+#[post("/quickdraw-matches")]
 pub async fn write_quickdraw_matches(
-    event_id: web::Path<Uuid>,
     request: HttpRequest,
     body: web::Bytes,
     pool: web::Data<PgPool>,
@@ -133,7 +132,7 @@ pub async fn write_quickdraw_matches(
     if !(1..=100).contains(&batch.matches.len()) {
         return Err(error::ErrorBadRequest("Supply 1–100 matches"));
     }
-    let mut matches = batch
+    let matches = batch
         .matches
         .into_iter()
         .enumerate()
@@ -142,17 +141,17 @@ pub async fn write_quickdraw_matches(
                 .map_err(|message| error::ErrorBadRequest(format!("matches[{index}]: {message}")))
         })
         .collect::<actix_web::Result<Vec<_>>>()?;
-    // Stable ordering preserves the first occurrence of duplicate IDs and avoids
-    // deadlocks when different events submit overlapping IDs in reverse order.
-    matches.sort_by_key(|report| report.id);
     let mut transaction = pool.begin().await.map_err(match_error)?;
-    // Share the scoring controls' per-event lock. A separate INSERT statement
-    // then observes any period change committed while this request waited.
-    sqlx::query_scalar!("SELECT id FROM events WHERE id = $1 FOR UPDATE", *event_id)
-        .fetch_optional(&mut *transaction)
+    let event_id = lock_active_event(&mut transaction)
         .await
         .map_err(match_error)?
-        .ok_or_else(|| error::ErrorNotFound("Event not found"))?;
+        .ok_or_else(|| error::ErrorConflict("No active event"))?;
+    // Share the scoring controls' per-event lock. A separate INSERT statement
+    // then observes any period change committed while this request waited.
+    sqlx::query_scalar!("SELECT id FROM events WHERE id = $1 FOR UPDATE", event_id)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(match_error)?;
     for report in matches {
         let inserted = sqlx::query!(
             "INSERT INTO quickdraw_matches
@@ -172,14 +171,14 @@ pub async fn write_quickdraw_matches(
                     ELSE 'scoring'
                  END)::quickdraw_scoring_status)
              ON CONFLICT (id) DO NOTHING",
-            report.id, *event_id, report.player_a_id, report.player_b_id,
+            report.id, event_id, report.player_a_id, report.player_b_id,
             report.player_a_team_id, report.player_b_team_id,
             report.player_a_draw_time_ms, report.player_b_draw_time_ms,
             report.winner_player_id, report.occurred_at,
         ).execute(&mut *transaction).await.map_err(match_error)?;
         if inserted.rows_affected() == 0 {
-            // A fresh statement also sees an initially concurrent conflicting
-            // insert from another event after ON CONFLICT has waited for it.
+            // Retries must belong to the current event too, even though the
+            // duplicate insert leaves the original record untouched.
             let owner = sqlx::query_scalar!(
                 "SELECT event_id FROM quickdraw_matches WHERE id = $1",
                 report.id
@@ -187,7 +186,7 @@ pub async fn write_quickdraw_matches(
             .fetch_one(&mut *transaction)
             .await
             .map_err(match_error)?;
-            if owner != *event_id {
+            if owner != event_id {
                 return Err(error::ErrorConflict(
                     "Match ID already belongs to another event",
                 ));
@@ -232,32 +231,25 @@ pub struct GetQuickdrawMatchesResponse {
 }
 
 #[utoipa::path(
-    tag = "Quickdraw", summary = "List event quickdraw matches",
-    description = "Returns saved results, including non-scoring matches, ordered by occurred_at descending then ID descending. Teams and scoring status are historical snapshots. Uses the explicit event regardless of active selection. Offset pagination reflects current records; late uploads can shift pages.",
-    params(("event_id" = Uuid, Path, description = "Event ID"), PaginationQuery),
+    tag = "Quickdraw", summary = "List quickdraw matches in the active event",
+    description = "Returns saved results, including non-scoring matches, ordered by occurred_at descending then ID descending. Teams and scoring status are historical snapshots. Uses the active event; returns 409 when none is selected. Offset pagination reflects current records; late uploads can shift pages.",
+    params(PaginationQuery),
     responses(
         (status = 200, description = "Matches and effective pagination", body = GetQuickdrawMatchesResponse),
         (status = 400, description = "Invalid pagination query"),
-        (status = 404, description = "Event not found or invalid event ID"),
+        (status = 409, description = "No active event"),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain")
     )
 )]
-#[get("/events/{event_id}/quickdraw-matches")]
+#[get("/quickdraw-matches")]
 pub async fn get_quickdraw_matches(
-    event_id: web::Path<Uuid>,
     parameters: web::Query<PaginationQuery>,
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<web::Json<GetQuickdrawMatchesResponse>> {
-    let exists = sqlx::query_scalar!(
-        r#"SELECT EXISTS (SELECT 1 FROM events WHERE id = $1) AS "exists!""#,
-        *event_id
-    )
-    .fetch_one(pool.get_ref())
-    .await
-    .map_err(match_error)?;
-    if !exists {
-        return Err(error::ErrorNotFound("Event not found"));
-    }
+    let event_id = get_active_event_id(pool.get_ref())
+        .await
+        .map_err(match_error)?
+        .ok_or_else(|| error::ErrorConflict("No active event"))?;
     let pagination = parameters.normalize();
     let (limit, offset) = pagination.limit_offset();
     let matches = sqlx::query_as!(
@@ -267,7 +259,7 @@ pub async fn get_quickdraw_matches(
            scoring_status AS "scoring_status: ScoringStatus"
            FROM quickdraw_matches WHERE event_id = $1
            ORDER BY occurred_at DESC, id DESC LIMIT $2 OFFSET $3"#,
-        *event_id,
+        event_id,
         limit,
         offset,
     )

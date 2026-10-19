@@ -16,8 +16,7 @@
 ## API documentation
 
 - Follow [ADR 0007](docs/adr/0007-active-event-api-scope.md) when choosing event
-  scope for routes. Routine operations use the active event; older management
-  routes with explicit event IDs are pending repair, not templates to copy.
+  scope for routes.
 - Update OpenAPI annotations alongside API changes.
 - Keep HTTP endpoint contracts in OpenAPI annotations and device message contracts
   in `.proto` comments. The generated API docs are the reference for consumers.

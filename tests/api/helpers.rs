@@ -101,6 +101,15 @@ impl TestApp {
         id
     }
 
+    pub async fn select_event(&self, id: Uuid) {
+        let response = self
+            .request(Method::PUT, &format!("/events/{id}/active"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 204);
+    }
+
     pub async fn post_protobuf<M>(&self, path: &str, message: &M) -> Response
     where
         M: Message,

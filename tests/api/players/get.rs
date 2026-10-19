@@ -44,11 +44,7 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
     assert_eq!(device.created_at_unix_ms, created.timestamp_millis());
 
     let team_response = app
-        .request_json(
-            Method::POST,
-            &format!("/events/{}/teams", device.event_id),
-            json!({"name": "Runners"}),
-        )
+        .request_json(Method::POST, "/teams", json!({"name": "Runners"}))
         .await;
     let team: Value = assert_json(team_response, 201).await;
     assert_eq!(
@@ -64,11 +60,7 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
     assert_eq!(
         app.request_json(
             Method::PATCH,
-            &format!(
-                "/events/{}/teams/{}",
-                device.event_id,
-                team["id"].as_str().unwrap()
-            ),
+            &format!("/teams/{}", team["id"].as_str().unwrap()),
             json!({"name": "Renamed team"})
         )
         .await
