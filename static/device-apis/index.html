@@ -196,6 +196,10 @@
                 </li>
               
                 <li>
+                  <a href="#alleycat.device.QuickdrawMatchRejection"><span class="badge">M</span>QuickdrawMatchRejection</a>
+                </li>
+              
+                <li>
                   <a href="#alleycat.device.WriteDeviceLogRequest"><span class="badge">M</span>WriteDeviceLogRequest</a>
                 </li>
               
@@ -203,6 +207,14 @@
                   <a href="#alleycat.device.WriteQuickdrawMatchesRequest"><span class="badge">M</span>WriteQuickdrawMatchesRequest</a>
                 </li>
               
+                <li>
+                  <a href="#alleycat.device.WriteQuickdrawMatchesResponse"><span class="badge">M</span>WriteQuickdrawMatchesResponse</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#alleycat.device.QuickdrawMatchErrorCode"><span class="badge">E</span>QuickdrawMatchErrorCode</a>
+                </li>
               
               
               
@@ -436,6 +448,51 @@ The first accepted upload supplies the timestamp and all other fields. </p></td>
 
         
       
+        <h3 id="alleycat.device.QuickdrawMatchRejection">QuickdrawMatchRejection</h3>
+        <p>First detected error for one match. Fixing it may reveal another error.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>match_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Zero-based request position. Use this to identify the entry; IDs may repeat. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>match_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>Exact submitted ID, including an empty or malformed value when invalid. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fields</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p>QuickdrawMatch field names. SAME_PLAYER includes both participant ID fields. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>code</td>
+                  <td><a href="#alleycat.device.QuickdrawMatchErrorCode">QuickdrawMatchErrorCode</a></td>
+                  <td></td>
+                  <td><p>Stable machine-readable reason. Clients must handle unknown future codes. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="alleycat.device.WriteDeviceLogRequest">WriteDeviceLogRequest</h3>
         <p>Request body for POST /device-logs.</p><p>The server generates:</p><p>- id</p><p>- received_at</p>
 
@@ -513,7 +570,7 @@ Must fit a signed 32-bit integer (maximum 2147483647). Zero is valid. </p></td>
         
       
         <h3 id="alleycat.device.WriteQuickdrawMatchesRequest">WriteQuickdrawMatchesRequest</h3>
-        <p>POST /quickdraw-matches, application/protobuf.</p><p>Send 1-100 completed matches for the currently active event. The server holds</p><p>that selection until the batch commits. No active event returns 409.</p><p>New matches must reference players and teams in the active event (400 otherwise).</p><p>A match ID already stored in another event returns 409, including on retries.</p><p>After an event switch, old-event uploads are rejected; they can be retried if</p><p>that event is selected again. Scoring still uses match time and the event's</p><p>delayed-score setting. Errors are plain text. The batch is atomic:</p><p>204 means every result was saved or already existed; failures save none.</p>
+        <p>POST /quickdraw-matches, application/protobuf.</p><p>Upload completed matches for the active event. 204 means all entries were</p><p>accepted; 200 returns WriteQuickdrawMatchesResponse with rejected entries.</p><p>See the HTTP API docs for request-wide errors and scoring behavior.</p>
 
         
           <table class="field-table">
@@ -536,7 +593,85 @@ Must fit a signed 32-bit integer (maximum 2147483647). Zero is valid. </p></td>
 
         
       
+        <h3 id="alleycat.device.WriteQuickdrawMatchesResponse">WriteQuickdrawMatchesResponse</h3>
+        <p>Response body for HTTP 200 from POST /quickdraw-matches, application/protobuf.</p><p>Retrying the same IDs is safe: the first accepted report is never overwritten.</p>
 
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>rejected</td>
+                  <td><a href="#alleycat.device.QuickdrawMatchRejection">QuickdrawMatchRejection</a></td>
+                  <td>repeated</td>
+                  <td><p>One rejection per failed entry, in request order; may include every entry.
+Entries not listed were saved or already stored. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="alleycat.device.QuickdrawMatchErrorCode">QuickdrawMatchErrorCode</h3>
+        <p>Reasons for rejecting an individual match.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>QUICKDRAW_MATCH_ERROR_CODE_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p>Unspecified/default value; never emitted by the server.</p></td>
+              </tr>
+            
+              <tr>
+                <td>QUICKDRAW_MATCH_ERROR_CODE_INVALID_UUID</td>
+                <td>1</td>
+                <td><p>A required UUID is missing/malformed, or a present optional UUID is malformed.</p></td>
+              </tr>
+            
+              <tr>
+                <td>QUICKDRAW_MATCH_ERROR_CODE_MISSING_FIELD</td>
+                <td>2</td>
+                <td><p>A required draw time or occurrence timestamp is absent.</p></td>
+              </tr>
+            
+              <tr>
+                <td>QUICKDRAW_MATCH_ERROR_CODE_OUT_OF_RANGE</td>
+                <td>3</td>
+                <td><p>A measurement or timestamp is outside its documented numeric range.</p></td>
+              </tr>
+            
+              <tr>
+                <td>QUICKDRAW_MATCH_ERROR_CODE_SAME_PLAYER</td>
+                <td>4</td>
+                <td><p>Both participant UUIDs are equal.</p></td>
+              </tr>
+            
+              <tr>
+                <td>QUICKDRAW_MATCH_ERROR_CODE_INVALID_WINNER</td>
+                <td>5</td>
+                <td><p>The winner UUID is neither participant.</p></td>
+              </tr>
+            
+              <tr>
+                <td>QUICKDRAW_MATCH_ERROR_CODE_INVALID_EVENT_REFERENCE</td>
+                <td>6</td>
+                <td><p>A player/team ID is unknown or belongs to another event.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
       
 
       

@@ -13,6 +13,20 @@
 - Add call-site tests for distinct behavior or meaningful integration risks;
   use representative coverage when multiple callers follow the same path.
 
+## Documentation style
+
+- Write all human-facing documentation in plain, natural language. This includes
+  READMEs, ADRs, guides, API descriptions, and comments used to generate docs.
+- Lead with what happens and why it matters to the reader. Prefer familiar words,
+  concrete examples, and short, direct sentences over jargon or formal phrasing.
+- Keep technical requirements precise. Preserve field names, limits, exceptions,
+  and tradeoffs; explain necessary technical terms rather than removing meaning.
+- Describe current behavior. Include repository history only when readers need
+  it to understand a decision or make a migration; keep that context in the
+  relevant ADR or migration guide rather than routine API or field descriptions.
+- Apply this style when creating or updating documentation. Edit the source of
+  generated docs and regenerate them using the required commands.
+
 ## API documentation
 
 - Follow [ADR 0007](docs/adr/0007-active-event-api-scope.md) when choosing event

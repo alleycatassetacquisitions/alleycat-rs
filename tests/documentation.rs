@@ -236,6 +236,10 @@ async fn quickdraw_contract_documents_binary_batches_and_scoring_outcomes() {
     let app = DocumentationApp::start().await;
     let spec = app.spec().await;
     let path = &spec["paths"]["/quickdraw-matches"];
+    assert_eq!(
+        path["post"]["responses"]["200"]["content"]["application/protobuf"]["schema"],
+        json!({"type": "string", "format": "binary"})
+    );
     let content = &path["post"]["requestBody"]["content"];
     assert_eq!(content.as_object().unwrap().len(), 1);
     assert_eq!(

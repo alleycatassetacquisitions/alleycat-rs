@@ -81,17 +81,50 @@ message WriteDeviceLogRequest {
 }
 
 // POST /quickdraw-matches, application/protobuf.
-// Send 1-100 completed matches for the currently active event. The server holds
-// that selection until the batch commits. No active event returns 409.
-// New matches must reference players and teams in the active event (400 otherwise).
-// A match ID already stored in another event returns 409, including on retries.
-// After an event switch, old-event uploads are rejected; they can be retried if
-// that event is selected again. Scoring still uses match time and the event's
-// delayed-score setting. Errors are plain text. The batch is atomic:
-// 204 means every result was saved or already existed; failures save none.
+// Upload completed matches for the active event. 204 means all entries were
+// accepted; 200 returns WriteQuickdrawMatchesResponse with rejected entries.
+// See the HTTP API docs for request-wide errors and scoring behavior.
 message WriteQuickdrawMatchesRequest {
   // Required batch of 1-100 completed matches. Maximum encoded request body: 256 KiB.
   repeated QuickdrawMatch matches = 1;
+}
+
+// Response body for HTTP 200 from POST /quickdraw-matches, application/protobuf.
+// Retrying the same IDs is safe: the first accepted report is never overwritten.
+message WriteQuickdrawMatchesResponse {
+  // One rejection per failed entry, in request order; may include every entry.
+  // Entries not listed were saved or already stored.
+  repeated QuickdrawMatchRejection rejected = 1;
+}
+
+// First detected error for one match. Fixing it may reveal another error.
+message QuickdrawMatchRejection {
+  // Zero-based request position. Use this to identify the entry; IDs may repeat.
+  uint32 match_index = 1;
+  // Exact submitted ID, including an empty or malformed value when invalid.
+  string match_id = 2;
+  // QuickdrawMatch field names. SAME_PLAYER includes both participant ID fields.
+  repeated string fields = 3;
+  // Stable machine-readable reason. Clients must handle unknown future codes.
+  QuickdrawMatchErrorCode code = 4;
+}
+
+// Reasons for rejecting an individual match.
+enum QuickdrawMatchErrorCode {
+  // Unspecified/default value; never emitted by the server.
+  QUICKDRAW_MATCH_ERROR_CODE_UNSPECIFIED = 0;
+  // A required UUID is missing/malformed, or a present optional UUID is malformed.
+  QUICKDRAW_MATCH_ERROR_CODE_INVALID_UUID = 1;
+  // A required draw time or occurrence timestamp is absent.
+  QUICKDRAW_MATCH_ERROR_CODE_MISSING_FIELD = 2;
+  // A measurement or timestamp is outside its documented numeric range.
+  QUICKDRAW_MATCH_ERROR_CODE_OUT_OF_RANGE = 3;
+  // Both participant UUIDs are equal.
+  QUICKDRAW_MATCH_ERROR_CODE_SAME_PLAYER = 4;
+  // The winner UUID is neither participant.
+  QUICKDRAW_MATCH_ERROR_CODE_INVALID_WINNER = 5;
+  // A player/team ID is unknown or belongs to another event.
+  QUICKDRAW_MATCH_ERROR_CODE_INVALID_EVENT_REFERENCE = 6;
 }
 
 message QuickdrawMatch {
