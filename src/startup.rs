@@ -2,10 +2,10 @@ use crate::configuration::{DatabaseSettings, Settings};
 use crate::routes::{
     VersionInfo, configure_documentation, create_affiliation, create_affiliation_category,
     create_event, create_team, get_device_logs, get_device_player_by_pin, get_game_state,
-    get_player, get_player_by_pin, get_players, get_quickdraw_matches, get_scoring, get_version,
-    health_check, list_affiliation_categories, list_affiliations, list_events, list_teams,
-    register_player, rename_affiliation, rename_affiliation_category, rename_team,
-    set_active_event, set_delayed_scores, set_scoring, update_event, update_player,
+    get_player, get_player_by_pin, get_player_scores, get_players, get_quickdraw_matches,
+    get_scoring, get_version, health_check, list_affiliation_categories, list_affiliations,
+    list_events, list_teams, register_player, rename_affiliation, rename_affiliation_category,
+    rename_team, set_active_event, set_delayed_scores, set_scoring, update_event, update_player,
     write_device_log, write_quickdraw_matches,
 };
 use actix_web::dev::Server;
@@ -62,6 +62,7 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
             .service(get_scoring)
             .service(set_scoring)
             .service(get_quickdraw_matches)
+            .service(get_player_scores)
             .service(write_quickdraw_matches)
             .split_for_parts();
         app.configure(|config| configure_documentation(config, api))

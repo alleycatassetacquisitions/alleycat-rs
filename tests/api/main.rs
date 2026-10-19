@@ -9,6 +9,7 @@ mod health_check;
 mod helpers;
 mod players;
 mod quickdraw;
+mod score;
 mod scoring;
 mod scoring_routes;
 mod teams;

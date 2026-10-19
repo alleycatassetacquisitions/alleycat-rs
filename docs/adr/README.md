@@ -48,3 +48,4 @@ context and rationale; typo fixes, clarifications, and repaired links are fine.
 | [0008: Include affiliations in device player lookups](0008-device-player-affiliations.md) | Accepted | 2026-10-18 |
 | [0009: Accept match uploads only for the active event](0009-active-event-match-uploads.md) | Partially superseded by 0010 | 2026-10-18 |
 | [0010: Accept valid matches from partially invalid batches](0010-partial-match-batch-acceptance.md) | Accepted | 2026-10-18 |
+| [0011: Player scoreboard](0011-player-scoreboard.md) | Accepted | 2026-10-18 |
