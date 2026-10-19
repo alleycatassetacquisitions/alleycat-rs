@@ -1,0 +1,66 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH totals AS (\n            SELECT participant.player_id,\n                   COUNT(*) FILTER (WHERE m.winner_player_id = participant.player_id) AS score,\n                   COUNT(*) AS matches_played,\n                   AVG(participant.draw_time_ms)::double precision AS average_draw_time_ms\n            FROM quickdraw_matches m\n            CROSS JOIN LATERAL (VALUES\n                (m.player_a_id, m.player_a_draw_time_ms),\n                (m.player_b_id, m.player_b_draw_time_ms)\n            ) AS participant(player_id, draw_time_ms)\n            WHERE m.event_id = $1 AND m.scoring_status = 'scoring'\n            GROUP BY participant.player_id\n        )\n        SELECT p.id, p.name, p.team_id, t.name AS \"team_name?\",\n               RANK() OVER (ORDER BY COALESCE(totals.score, 0) DESC) AS \"rank!\",\n               COALESCE(totals.score, 0) AS \"score!\",\n               COALESCE(totals.matches_played, 0) AS \"matches_played!\",\n               totals.average_draw_time_ms AS \"average_draw_time_ms?\"\n        FROM players p\n        LEFT JOIN teams t ON t.id = p.team_id AND t.event_id = p.event_id\n        LEFT JOIN totals ON totals.player_id = p.id\n        WHERE p.event_id = $1\n        ORDER BY COALESCE(totals.score, 0) DESC, p.name COLLATE \"C\", p.id\n        LIMIT $2 OFFSET $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "team_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "team_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "rank!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "score!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "matches_played!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "average_draw_time_ms?",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "be7d777f955acaddf38b2e8c7a072c79f08e5e0ac6ff950e03cf8dd47595f134"
+}
