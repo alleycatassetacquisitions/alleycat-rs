@@ -41,11 +41,12 @@ context and rationale; typo fixes, clarifications, and repaired links are fine.
 | [0001: Quickdraw results and scoring periods](0001-quickdraw-results-and-scoring-periods.md) | Partially superseded by 0003 | 2026-10-11 |
 | [0002: Quickdraw device ingestion](0002-quickdraw-device-ingestion.md) | Partially superseded by 0009 and 0010 | 2026-10-11 |
 | [0003: Reversible delayed scoring](0003-reversible-delayed-scoring.md) | Accepted | 2026-10-15 |
-| [0004: Player lifecycle and device lookups](0004-player-lifecycle-and-device-lookups.md) | Partially superseded by 0009 | 2026-10-15 |
+| [0004: Player lifecycle and device lookups](0004-player-lifecycle-and-device-lookups.md) | Partially superseded by 0009 and 0012 | 2026-10-15 |
 | [0005: Extension-free scoring-period constraints](0005-extension-free-scoring-periods.md) | Accepted | 2026-10-16 |
 | [0006: Event affiliations](0006-event-affiliations.md) | Partially superseded by 0008 | 2026-10-17 |
 | [0007: Use the active event for routine API operations](0007-active-event-api-scope.md) | Partially superseded by 0009 | 2026-10-18 |
-| [0008: Include affiliations in device player lookups](0008-device-player-affiliations.md) | Accepted | 2026-10-18 |
+| [0008: Include affiliations in device player lookups](0008-device-player-affiliations.md) | Partially superseded by 0012 | 2026-10-18 |
 | [0009: Accept match uploads only for the active event](0009-active-event-match-uploads.md) | Partially superseded by 0010 | 2026-10-18 |
 | [0010: Accept valid matches from partially invalid batches](0010-partial-match-batch-acceptance.md) | Accepted | 2026-10-18 |
 | [0011: Player scoreboard](0011-player-scoreboard.md) | Accepted | 2026-10-18 |
+| [0012: Keep current PDN constraints at the device response boundary](0012-current-pdn-constraints.md) | Accepted | 2026-10-20 |

@@ -21,7 +21,7 @@ do not edit these files manually.
 | [public.teams](public.teams.md) | 3 |  | BASE TABLE |
 | [public.event_scoring_periods](public.event_scoring_periods.md) | 4 | Event scoring history. Opening creates a row; closing fills closes_at. Match eligibility uses device occurrence time, not upload time. No unclosed period means scoring is disabled. | BASE TABLE |
 | [public.quickdraw_matches](public.quickdraw_matches.md) | 12 | Completed two-player quickdraw results, including non-scoring duels. Ingestion must use INSERT ... ON CONFLICT (id) DO NOTHING: the first accepted report and its device timestamp win. No per-device reports or leaderboard totals are stored. | BASE TABLE |
-| [public.affiliation_categories](public.affiliation_categories.md) | 3 | Operator-defined affiliation categories within an event. No seeded categories or implied gameplay behavior. | BASE TABLE |
+| [public.affiliation_categories](public.affiliation_categories.md) | 4 | Operator-defined affiliation categories within an event. No seeded categories or implied gameplay behavior. | BASE TABLE |
 | [public.affiliations](public.affiliations.md) | 4 | Operator-defined affiliations within a category. Names have no implicit gameplay or permission behavior. | BASE TABLE |
 | [public.player_affiliations](public.player_affiliations.md) | 4 | At most one affiliation per player per category. Composite foreign keys keep player, category, and affiliation in the same event. Clearing an assignment deletes its row; changes do not affect scores. | BASE TABLE |
 
@@ -128,6 +128,7 @@ erDiagram
   uuid id
   uuid event_id FK
   text name
+  boolean send_to_devices
 }
 "public.affiliations" {
   uuid id

@@ -1,5 +1,5 @@
 use crate::events::lock_active_event;
-use crate::routes::errors::database_error;
+use crate::routes::helpers::errors::database_error;
 use crate::routes::scoring::ScoringState;
 use actix_web::{HttpResponse, error, get, put, web};
 use chrono::{DateTime, Utc};

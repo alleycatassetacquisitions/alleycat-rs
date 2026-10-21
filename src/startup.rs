@@ -4,8 +4,8 @@ use crate::routes::{
     create_event, create_team, get_device_logs, get_device_player_by_pin, get_game_state,
     get_player, get_player_by_pin, get_player_scores, get_players, get_quickdraw_matches,
     get_scoring, get_version, health_check, list_affiliation_categories, list_affiliations,
-    list_events, list_teams, register_player, rename_affiliation, rename_affiliation_category,
-    rename_team, set_active_event, set_delayed_scores, set_scoring, update_event, update_player,
+    list_events, list_teams, register_player, rename_affiliation, rename_team, set_active_event,
+    set_delayed_scores, set_scoring, update_affiliation_category, update_event, update_player,
     write_device_log, write_quickdraw_matches,
 };
 use actix_web::dev::Server;
@@ -51,7 +51,7 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
             .service(get_game_state)
             .service(set_delayed_scores)
             .service(create_affiliation_category)
-            .service(rename_affiliation_category)
+            .service(update_affiliation_category)
             .service(list_affiliation_categories)
             .service(create_affiliation)
             .service(rename_affiliation)

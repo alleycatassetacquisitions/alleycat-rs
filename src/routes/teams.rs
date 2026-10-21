@@ -1,5 +1,5 @@
 use crate::events::{get_active_event_id, lock_active_event};
-use crate::routes::errors;
+use crate::routes::helpers::errors;
 use actix_web::{HttpResponse, error, get, patch, post, web};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;

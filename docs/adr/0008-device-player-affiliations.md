@@ -1,6 +1,6 @@
 # 0008: Include affiliations in device player lookups
 
-- Status: Accepted
+- Status: Partially superseded by [0012](0012-current-pdn-constraints.md) for unconditional affiliation exposure and the additive-only response change. Other decisions remain in effect.
 - Date: 2026-10-18
 - Supersedes: [0006](0006-event-affiliations.md) only for keeping affiliations out of device responses.
 

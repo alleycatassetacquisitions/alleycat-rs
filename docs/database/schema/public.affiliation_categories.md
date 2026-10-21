@@ -11,6 +11,7 @@ Operator-defined affiliation categories within an event. No seeded categories or
 | id | uuid | gen_random_uuid() | false | [public.affiliations](public.affiliations.md) |  |  |
 | event_id | uuid |  | false | [public.affiliations](public.affiliations.md) | [public.events](public.events.md) |  |
 | name | text |  | false |  |  |  |
+| send_to_devices | boolean | false | false |  |  | Include assignments in this category in device player lookups. Defaults to false; staff responses always include all assignments. |
 
 ## Constraints
 
@@ -20,6 +21,7 @@ Operator-defined affiliation categories within an event. No seeded categories or
 | affiliation_categories_id_not_null | n | NOT NULL id |
 | affiliation_categories_name_check | CHECK | CHECK (((name <> ''::text) AND (name = btrim(name)) AND (char_length(name) <= 256))) |
 | affiliation_categories_name_not_null | n | NOT NULL name |
+| affiliation_categories_send_to_devices_not_null | n | NOT NULL send_to_devices |
 | affiliation_categories_event_id_fkey | FOREIGN KEY | FOREIGN KEY (event_id) REFERENCES events(id) |
 | affiliation_categories_pkey | PRIMARY KEY | PRIMARY KEY (id) |
 | affiliation_categories_event_name_key | UNIQUE | UNIQUE (event_id, name) |
@@ -45,6 +47,7 @@ erDiagram
   uuid id
   uuid event_id FK
   text name
+  boolean send_to_devices
 }
 "public.affiliations" {
   uuid id

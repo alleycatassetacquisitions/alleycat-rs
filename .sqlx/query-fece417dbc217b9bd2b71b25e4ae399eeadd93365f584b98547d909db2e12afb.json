@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE affiliation_categories SET name = $3 WHERE event_id = $1 AND id = $2 RETURNING id, event_id, name",
+  "query": "UPDATE affiliation_categories SET name = COALESCE($3, name), send_to_devices = COALESCE($4, send_to_devices) WHERE event_id = $1 AND id = $2 RETURNING id, event_id, name, send_to_devices",
   "describe": {
     "columns": [
       {
@@ -17,20 +17,27 @@
         "ordinal": 2,
         "name": "name",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "send_to_devices",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
         "Uuid",
-        "Text"
+        "Text",
+        "Bool"
       ]
     },
     "nullable": [
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "4d35dd9c61bcfe9d96fd190f1f52af2cece50a6257631693355afe291dd7ac20"
+  "hash": "fece417dbc217b9bd2b71b25e4ae399eeadd93365f584b98547d909db2e12afb"
 }

@@ -1,7 +1,7 @@
 use crate::events::lock_active_event;
-use crate::routes::errors;
+use crate::routes::helpers::errors;
 use actix_web::{HttpResponse, error, get, patch, post, web};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -15,14 +15,52 @@ pub struct AffiliationName {
 
 impl AffiliationName {
     fn validated(&self) -> actix_web::Result<&str> {
-        let name = self.name.trim();
-        if name.is_empty() || name.chars().count() > 256 || name.contains('\0') {
-            return Err(error::ErrorBadRequest(
-                "Name must contain 1–256 Unicode scalar values after trimming and no null characters",
-            ));
-        }
-        Ok(name)
+        validate_name(&self.name)
     }
+}
+
+fn validate_name(name: &str) -> actix_web::Result<&str> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > 256 || name.contains('\0') {
+        return Err(error::ErrorBadRequest(
+            "Name must contain 1–256 Unicode scalar values after trimming and no null characters",
+        ));
+    }
+    Ok(name)
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CreateAffiliationCategory {
+    /// Trimmed before saving. Requires 1–256 Unicode scalar values, without null characters.
+    /// Names are case-sensitive and unique within their event.
+    name: String,
+    /// Include this category's assignments in device player lookups. Defaults to false.
+    #[serde(default)]
+    #[schema(default = false)]
+    send_to_devices: bool,
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateAffiliationCategory {
+    /// Same validation as creation. Omission preserves the name; null is rejected.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(nullable = false)]
+    name: Option<String>,
+    /// Include this category's assignments in device player lookups.
+    /// Omission preserves the setting; null is rejected.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(nullable = false)]
+    send_to_devices: Option<bool>,
+}
+
+fn present<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -30,6 +68,8 @@ pub struct AffiliationCategoryResponse {
     id: Uuid,
     event_id: Uuid,
     name: String,
+    /// Whether this category's assignments appear in device player lookups.
+    send_to_devices: bool,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -67,8 +107,8 @@ async fn begin_active_event(pool: &PgPool) -> actix_web::Result<(Transaction<'_,
 
 #[utoipa::path(
     tag = "Affiliations", summary = "Create an affiliation category",
-    description = "Creates an operator-defined category in the active event. Returns 409 when no event is active. Uses AffiliationName validation. Creates no player assignments and grants no gameplay behavior.",
-    request_body(content = AffiliationName, example = json!({"name": "Faction"})),
+    description = "Creates an operator-defined category in the active event. Returns 409 when no event is active. send_to_devices defaults to false; enable it to include assignments in device player lookups. Staff responses always include all assignments. Creates no player assignments and grants no gameplay behavior. Unknown fields are rejected.",
+    request_body(content = CreateAffiliationCategory, example = json!({"name": "Faction", "send_to_devices": true})),
     responses(
         (status = 201, description = "Saved category", body = AffiliationCategoryResponse),
         (status = 400, description = "Invalid JSON, unknown fields, or invalid name"),
@@ -78,15 +118,15 @@ async fn begin_active_event(pool: &PgPool) -> actix_web::Result<(Transaction<'_,
 )]
 #[post("/affiliation-categories")]
 pub async fn create_affiliation_category(
-    body: web::Json<AffiliationName>,
+    body: web::Json<CreateAffiliationCategory>,
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
     let (mut transaction, event_id) = begin_active_event(pool.get_ref()).await?;
-    let name = body.validated()?;
+    let name = validate_name(&body.name)?;
     let result = sqlx::query_as!(
         AffiliationCategoryResponse,
-        "INSERT INTO affiliation_categories (event_id, name) SELECT id, $2 FROM events WHERE id = $1 RETURNING id, event_id, name",
-        event_id, name
+        "INSERT INTO affiliation_categories (event_id, name, send_to_devices) SELECT id, $2, $3 FROM events WHERE id = $1 RETURNING id, event_id, name, send_to_devices",
+        event_id, name, body.send_to_devices
     )
     .fetch_one(&mut *transaction)
     .await
@@ -96,31 +136,34 @@ pub async fn create_affiliation_category(
 }
 
 #[utoipa::path(
-    tag = "Affiliations", summary = "Rename an affiliation category",
-    description = "Uses the active event; returns 409 when none is selected. Requires name, following AffiliationName validation. Preserves the ID and player assignments. Event and category cannot be changed; unknown fields are rejected. Renaming to the current name succeeds. No deletion endpoint is provided.",
+    tag = "Affiliations", summary = "Update an affiliation category",
+    description = "Uses the active event; returns 409 when none is selected. Supply name, send_to_devices, or both. Omitted fields stay unchanged; nulls, unknown fields, and empty updates are rejected. Preserves the ID and player assignments. Changing send_to_devices takes effect on the next device lookup and does not change staff responses. Event cannot be changed. Renaming to the current name succeeds. No deletion endpoint is provided.",
     params(("category_id" = Uuid, Path, description = "Category ID")),
-    request_body(content = AffiliationName, example = json!({"name": "Faction"})),
+    request_body(content = UpdateAffiliationCategory, example = json!({"send_to_devices": true})),
     responses(
         (status = 200, description = "Saved category", body = AffiliationCategoryResponse),
-        (status = 400, description = "Invalid JSON, unknown fields, or invalid name"),
+        (status = 400, description = "Invalid JSON, unknown fields, invalid name, null, or no changes supplied"),
         (status = 404, description = "Resource not found in the active event or invalid ID"),
         (status = 409, description = "No active event or name already exists within this parent"),
         (status = 500, description = "Database operation failed", body = String, content_type = "text/plain")
     )
 )]
 #[patch("/affiliation-categories/{category_id}")]
-pub async fn rename_affiliation_category(
+pub async fn update_affiliation_category(
     path: web::Path<Uuid>,
-    body: web::Json<AffiliationName>,
+    body: web::Json<UpdateAffiliationCategory>,
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
     let category_id = *path;
     let (mut transaction, event_id) = begin_active_event(pool.get_ref()).await?;
-    let name = body.validated()?;
+    if body.name.is_none() && body.send_to_devices.is_none() {
+        return Err(error::ErrorBadRequest("Supply name or send_to_devices"));
+    }
+    let name = body.name.as_deref().map(validate_name).transpose()?;
     let result = sqlx::query_as!(
         AffiliationCategoryResponse,
-        "UPDATE affiliation_categories SET name = $3 WHERE event_id = $1 AND id = $2 RETURNING id, event_id, name",
-        event_id, category_id, name
+        "UPDATE affiliation_categories SET name = COALESCE($3, name), send_to_devices = COALESCE($4, send_to_devices) WHERE event_id = $1 AND id = $2 RETURNING id, event_id, name, send_to_devices",
+        event_id, category_id, name, body.send_to_devices
     )
     .fetch_optional(&mut *transaction)
     .await
@@ -146,7 +189,7 @@ pub async fn list_affiliation_categories(
     let (mut transaction, event_id) = begin_active_event(pool.get_ref()).await?;
     let result = sqlx::query_as!(
         AffiliationCategoryResponse,
-        "SELECT id, event_id, name FROM affiliation_categories WHERE event_id = $1 ORDER BY name, id",
+        "SELECT id, event_id, name, send_to_devices FROM affiliation_categories WHERE event_id = $1 ORDER BY name, id",
         event_id
     )
     .fetch_all(&mut *transaction)

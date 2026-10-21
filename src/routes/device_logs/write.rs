@@ -1,6 +1,6 @@
 use crate::proto::alleycat::device::WriteDeviceLogRequest;
-use crate::routes::errors::database_error;
-use crate::routes::protobuf::{self, ProtobufBody};
+use crate::routes::helpers::errors::database_error;
+use crate::routes::helpers::protobuf::{self, ProtobufBody};
 use actix_web::post;
 use actix_web::{HttpRequest, HttpResponse, error, web};
 use sqlx::PgPool;

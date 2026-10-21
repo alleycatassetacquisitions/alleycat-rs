@@ -1,4 +1,4 @@
-use crate::routes::errors::database_error;
+use crate::routes::helpers::errors::database_error;
 use actix_web::{HttpResponse, error, web};
 use actix_web::{get, patch, post, put};
 use chrono::{DateTime, Utc};

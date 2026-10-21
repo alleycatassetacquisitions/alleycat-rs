@@ -92,6 +92,7 @@ erDiagram
   uuid id
   uuid event_id FK
   text name
+  boolean send_to_devices
 }
 ```
 
