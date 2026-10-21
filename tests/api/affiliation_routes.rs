@@ -67,6 +67,121 @@ fn membership(category: &Value, affiliation: &Value) -> Value {
 }
 
 #[tokio::test]
+async fn category_device_visibility_is_opt_in_and_does_not_change_staff_assignments() {
+    let app = spawn_app_with_event().await;
+    let player = register_player(&app, "José").await;
+    let category = category(&app, "Café").await;
+    assert_eq!(category["send_to_devices"], false);
+    let affiliation = affiliation(&app, &category, &"Æ".repeat(128)).await;
+    let staff = assign(&app, &player, &category, affiliation["id"].clone()).await;
+    let device_path = format!(
+        "/device/players/by-pin/{}",
+        player["pdn_code"].as_str().unwrap()
+    );
+    let device =
+        DevicePlayerResponse::decode(app.get(&device_path).await.bytes().await.unwrap()).unwrap();
+    assert!(device.affiliations.is_empty());
+    assert_eq!(device.name, "Jose");
+
+    for enabled in [true, false, true] {
+        let response = app
+            .request_json(
+                Method::PATCH,
+                &category_path(&category),
+                json!({"send_to_devices": enabled}),
+            )
+            .await;
+        let updated: Value = assert_json(response, 200).await;
+        assert_eq!(updated["name"], "Café");
+        assert_eq!(updated["send_to_devices"], enabled);
+        let listed: Value = assert_json(app.get(&categories_path()).await, 200).await;
+        assert_eq!(listed, json!([updated]));
+        let device =
+            DevicePlayerResponse::decode(app.get(&device_path).await.bytes().await.unwrap())
+                .unwrap();
+        if enabled {
+            assert_eq!(device.affiliations.len(), 1);
+            let assignment = &device.affiliations[0];
+            assert_eq!(
+                Uuid::from_slice(&assignment.category_id)
+                    .unwrap()
+                    .to_string(),
+                category["id"]
+            );
+            assert_eq!(
+                Uuid::from_slice(&assignment.affiliation_id)
+                    .unwrap()
+                    .to_string(),
+                affiliation["id"]
+            );
+            assert_eq!(assignment.category_name, "Cafe");
+            assert_eq!(
+                assignment.affiliation_name,
+                format!("{}A", "AE".repeat(127))
+            );
+        } else {
+            assert!(device.affiliations.is_empty());
+        }
+        let current_staff: Value = assert_json(app.get(&player_path(&player)).await, 200).await;
+        assert_eq!(current_staff, staff);
+    }
+
+    // Renaming preserves the setting; the UI may still store Unicode names.
+    let response = app
+        .request_json(
+            Method::PATCH,
+            &category_path(&category),
+            json!({"name": "Renamé"}),
+        )
+        .await;
+    let renamed: Value = assert_json(response, 200).await;
+    assert_eq!(renamed["send_to_devices"], true);
+    assert_eq!(renamed["name"], "Renamé");
+
+    let explicit: Value = assert_json(
+        app.request_json(
+            Method::POST,
+            &categories_path(),
+            json!({"name": "Enabled", "send_to_devices": true}),
+        )
+        .await,
+        201,
+    )
+    .await;
+    assert_eq!(explicit["send_to_devices"], true);
+
+    for body in [
+        json!({}),
+        json!({"send_to_devices": null}),
+        json!({"send_to_devices": "true"}),
+        json!({"name": null}),
+        json!({"name": " ", "send_to_devices": false}),
+    ] {
+        assert_text_error(
+            app.request_json(Method::PATCH, &category_path(&category), body)
+                .await,
+            400,
+        )
+        .await;
+    }
+    let unchanged: Value = assert_json(app.get(&categories_path()).await, 200).await;
+    assert_eq!(unchanged, json!([explicit, renamed]));
+
+    app.activate_new_event().await;
+    assert_text_error(
+        app.request_json(
+            Method::PATCH,
+            &category_path(&category),
+            json!({"send_to_devices": false}),
+        )
+        .await,
+        404,
+    )
+    .await;
+    assert_eq!(app.get(&device_path).await.status(), 404);
+}
+
+#[tokio::test]
 async fn catalogs_are_event_scoped_sorted_and_names_are_unique_within_their_parent() {
     let app = spawn_app().await;
     let first_event = app.activate_new_event().await;
@@ -395,6 +510,16 @@ async fn current_assignments_and_names_reach_player_json_and_devices() {
     let helix = affiliation(&app, &allegiance, "Helix Industries").await;
     let category = category(&app, "Faction").await;
     let affiliation = affiliation(&app, &category, "Corvid Alliance").await;
+    for enabled in [&allegiance, &category] {
+        let response = app
+            .request_json(
+                Method::PATCH,
+                &category_path(enabled),
+                json!({"send_to_devices": true}),
+            )
+            .await;
+        assert_eq!(response.status(), 200);
+    }
     let device_path = format!(
         "/device/players/by-pin/{}",
         player["pdn_code"].as_str().unwrap()
@@ -441,9 +566,15 @@ async fn current_assignments_and_names_reach_player_json_and_devices() {
     let mut expected_affiliations: Vec<_> = [&expected[0], &expected[1]]
         .into_iter()
         .map(|assignment| DevicePlayerAffiliation {
-            category_id: assignment["category_id"].as_str().unwrap().to_owned(),
+            category_id: Uuid::parse_str(assignment["category_id"].as_str().unwrap())
+                .unwrap()
+                .as_bytes()
+                .to_vec(),
             category_name: assignment["category_name"].as_str().unwrap().to_owned(),
-            affiliation_id: assignment["affiliation_id"].as_str().unwrap().to_owned(),
+            affiliation_id: Uuid::parse_str(assignment["affiliation_id"].as_str().unwrap())
+                .unwrap()
+                .as_bytes()
+                .to_vec(),
             affiliation_name: assignment["affiliation_name"].as_str().unwrap().to_owned(),
         })
         .collect();

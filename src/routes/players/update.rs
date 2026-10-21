@@ -1,7 +1,7 @@
 use super::PlayerResponse;
 use crate::domain::{PlayerEmail, PlayerName};
 use crate::events::lock_active_event;
-use crate::routes::errors::database_error;
+use crate::routes::helpers::errors::database_error;
 use actix_web::{HttpResponse, error, patch, web};
 use serde::{Deserialize, Deserializer};
 use sqlx::PgPool;
@@ -21,7 +21,7 @@ pub struct UpdatePlayer {
     /// Must be a team in this event. Null removes membership.
     #[serde(default, deserialize_with = "present")]
     team_id: Option<Option<Uuid>>,
-    /// Reversible registration/device status; never changes match history.
+    /// Reversible registration status; never changes match history.
     #[serde(default, deserialize_with = "present")]
     #[schema(nullable = false)]
     active: Option<bool>,
@@ -58,7 +58,7 @@ fn update_error(error: sqlx::Error) -> actix_web::Error {
 
 #[utoipa::path(
     tag = "Players", summary = "Update a player in the active event",
-    description = "Supply name, email, team_id, active, or at least one entry in affiliations. Omitted fields remain unchanged; email and team_id may be null to clear them. Name uses registration validation. Teams must belong to this event; an existing membership may be replaced. UUID, event, PIN, and creation time are immutable. Inactive registrations remain listed and discoverable and keep their names/PINs. Team/status changes never rewrite scores or prevent delayed uploads. Unknown fields are rejected. Affiliations is an object keyed by category UUID: an affiliation UUID assigns or replaces that category, and null clears it. Omitted categories remain unchanged. All player and affiliation changes succeed or fail together. Returns full player details with current affiliation IDs and names. Affiliations do not change permissions or scores. Current assignments are also included in device protobuf lookups.",
+    description = "Supply name, email, team_id, active, or at least one entry in affiliations. Omitted fields remain unchanged; email and team_id may be null to clear them. Name uses registration validation. Teams must belong to this event; an existing membership may be replaced. UUID, event, PIN, and creation time are immutable. Inactive registrations remain listed and discoverable and keep their names/PINs. Team/status changes never rewrite scores or prevent delayed uploads. Unknown fields are rejected. Affiliations is an object keyed by category UUID: an affiliation UUID assigns or replaces that category, and null clears it. Omitted categories remain unchanged. All player and affiliation changes succeed or fail together. Returns full player details with current affiliation IDs and names. Affiliations do not change permissions or scores. Assignments in categories enabled for devices are also included in device protobuf lookups.",
     params(("id" = Uuid, Path, description = "Player ID")),
     request_body(content = UpdatePlayer, example = json!({"name": "Alex Updated", "affiliations": {"11111111-1111-4111-8111-111111111111": "22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333": null}})),
     responses((status = 200, description = "Full updated player details", body = PlayerResponse),

@@ -22,7 +22,7 @@ pub(super) struct PlayerResponse {
     pub(super) team_id: Option<Uuid>,
     /// Current team name; null when unassigned.
     pub(super) team_name: Option<String>,
-    /// Registration/device status. Changing it never rewrites match history.
+    /// Registration status. Changing it never rewrites match history.
     pub(super) active: bool,
     /// Current assignments, ordered by category name then category ID. Empty when unassigned.
     /// Includes only assigned categories; names reflect current category and affiliation names.

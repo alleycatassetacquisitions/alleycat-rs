@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO affiliation_categories (event_id, name) SELECT id, $2 FROM events WHERE id = $1 RETURNING id, event_id, name",
+  "query": "INSERT INTO affiliation_categories (event_id, name, send_to_devices) SELECT id, $2, $3 FROM events WHERE id = $1 RETURNING id, event_id, name, send_to_devices",
   "describe": {
     "columns": [
       {
@@ -17,19 +17,26 @@
         "ordinal": 2,
         "name": "name",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "send_to_devices",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "Text"
+        "Text",
+        "Bool"
       ]
     },
     "nullable": [
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "e303c503efb1a7e5cd1e41be86f43d1f370b9eb9e6cfe340319757a95c48d1c1"
+  "hash": "c085d509e0f28fb53b569c4102cfdd933094ed0d340490e601cae78a09692520"
 }

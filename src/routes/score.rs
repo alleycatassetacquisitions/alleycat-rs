@@ -1,6 +1,6 @@
 use crate::events::get_active_event_id;
-use crate::routes::errors::database_error;
-use crate::routes::pagination::{Pagination, PaginationQuery};
+use crate::routes::helpers::errors::database_error;
+use crate::routes::helpers::pagination::{Pagination, PaginationQuery};
 use actix_web::{error, get, web};
 use serde::Serialize;
 use sqlx::PgPool;

@@ -234,7 +234,7 @@
 
       
         <h3 id="alleycat.device.DevicePlayerAffiliation">DevicePlayerAffiliation</h3>
-        <p>One current player assignment. Categories and affiliations belong to the</p><p>player's event. Use UUIDs for identity; names may change.</p>
+        <p>One current player assignment. Categories and affiliations belong to the</p><p>player's event. UUIDs use the 16-byte representation and names use the PDN</p><p>display profile described in DevicePlayerResponse. Use UUIDs for identity.</p>
 
         
           <table class="field-table">
@@ -245,7 +245,7 @@
               
                 <tr>
                   <td>category_id</td>
-                  <td><a href="#string">string</a></td>
+                  <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>Category UUID. </p></td>
                 </tr>
@@ -259,7 +259,7 @@
               
                 <tr>
                   <td>affiliation_id</td>
-                  <td><a href="#string">string</a></td>
+                  <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>Affiliation UUID within this category. </p></td>
                 </tr>
@@ -279,7 +279,7 @@
         
       
         <h3 id="alleycat.device.DevicePlayerResponse">DevicePlayerResponse</h3>
-        <p>Response for GET /device/players/by-pin/{pin}, application/protobuf.</p><p>No request body. The path PIN is exactly four ASCII digits, including leading</p><p>zeros, and is resolved in the active event. Invalid PIN format returns 400;</p><p>no active event or no matching player returns 404. Errors are plain text.</p><p>Email is deliberately absent from this device-only response.</p>
+        <p>Response for GET /device/players/by-pin/{pin}, application/protobuf.</p><p>No request body. The path PIN is exactly four ASCII digits, including leading</p><p>zeros, and is resolved in the active event. Invalid PIN format returns 400;</p><p>no active event or no matching player returns 404. Errors are plain text.</p><p>Includes inactive registrations, without exposing their status. Email, PIN,</p><p>event ID, creation time, and active status are not part of this response.</p><p>Current PDN display profile: control characters become ?, then display strings</p><p>are transliterated to ASCII. Unknown characters and any remaining non-printable</p><p>output become ?. The result is truncated to 255 bytes. Only printable ASCII</p><p>(0x20-0x7E) is sent; no null terminator is sent.</p><p>Stored names are unchanged. Display text may be empty or collide after conversion;</p><p>use UUIDs for identity. Firmware using C strings needs room for a terminator.</p><p>UUIDs are exactly 16 bytes in RFC 9562 network byte order: the byte pairs of</p><p>the canonical hexadecimal UUID, with hyphens removed (not little-endian GUIDs).</p>
 
         
           <table class="field-table">
@@ -290,42 +290,21 @@
               
                 <tr>
                   <td>id</td>
-                  <td><a href="#string">string</a></td>
+                  <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>Player UUID. Stable for this registration. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>event_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>Event UUID. PINs are unique only within an event. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>pdn_code</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>Four-digit PIN; preserve leading zeros. </p></td>
                 </tr>
               
                 <tr>
                   <td>name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>Current player display name. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>created_at_unix_ms</td>
-                  <td><a href="#int64">int64</a></td>
-                  <td></td>
-                  <td><p>Registration creation time in UTC milliseconds since 1970-01-01. </p></td>
+                  <td><p>Current player display name, using the PDN display profile above. </p></td>
                 </tr>
               
                 <tr>
                   <td>team_id</td>
-                  <td><a href="#string">string</a></td>
+                  <td><a href="#bytes">bytes</a></td>
                   <td>optional</td>
                   <td><p>Current team UUID, absent when unassigned. Not a match-time snapshot. </p></td>
                 </tr>
@@ -334,25 +313,17 @@
                   <td>team_name</td>
                   <td><a href="#string">string</a></td>
                   <td>optional</td>
-                  <td><p>Current team name, absent when unassigned. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>active</td>
-                  <td><a href="#bool">bool</a></td>
-                  <td></td>
-                  <td><p>True for active registrations. Inactive players remain discoverable with
-false; clients should honor this status. It does not rewrite match scores
-or prevent uploads of previously completed matches. </p></td>
+                  <td><p>Current team name using the PDN display profile; absent when unassigned. </p></td>
                 </tr>
               
                 <tr>
                   <td>affiliations</td>
                   <td><a href="#alleycat.device.DevicePlayerAffiliation">DevicePlayerAffiliation</a></td>
                   <td>repeated</td>
-                  <td><p>Current assignments in this event, ordered by category name then category UUID.
-At most one affiliation per category. Unassigned categories are omitted;
-an unassigned player has an empty list. Names reflect current renames.
+                  <td><p>Current assignments in categories with send_to_devices=true, ordered by the
+original category name then category UUID. At most one affiliation per category.
+Unassigned and disabled categories are omitted. May be empty; there is no fixed
+count limit. Names reflect current renames and use the PDN display profile.
 These are membership details, not permissions or match-time scoring snapshots. </p></td>
                 </tr>
               

@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id, p.name, p.team_id, t.name AS \"team_name?\",\n            COALESCE((\n                SELECT jsonb_agg(jsonb_build_object(\n                    'category_id', c.id, 'category_name', c.name,\n                    'affiliation_id', a.id, 'affiliation_name', a.name\n                ) ORDER BY c.name, c.id)\n                FROM player_affiliations pa\n                JOIN affiliation_categories c ON c.id = pa.category_id AND c.event_id = pa.event_id\n                JOIN affiliations a ON a.id = pa.affiliation_id AND a.category_id = pa.category_id AND a.event_id = pa.event_id\n                WHERE pa.player_id = p.id AND pa.event_id = p.event_id\n                  AND c.send_to_devices\n            ), '[]'::jsonb) AS \"affiliations!: sqlx::types::Json<Vec<PlayerAffiliation>>\"\n           FROM players p LEFT JOIN teams t ON t.id = p.team_id AND t.event_id = p.event_id\n           WHERE p.event_id = (SELECT active_event_id FROM app_state WHERE id = 1)\n             AND p.pdn_code = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "team_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "team_name?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "affiliations!: sqlx::types::Json<Vec<PlayerAffiliation>>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "0bca67d66d5388af9fcea3efda44420007f88efcd0732c99f6b77b2a7721490f"
+}

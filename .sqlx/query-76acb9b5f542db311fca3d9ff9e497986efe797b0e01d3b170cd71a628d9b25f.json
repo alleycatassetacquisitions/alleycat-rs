@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, event_id, name FROM affiliation_categories WHERE event_id = $1 ORDER BY name, id",
+  "query": "SELECT id, event_id, name, send_to_devices FROM affiliation_categories WHERE event_id = $1 ORDER BY name, id",
   "describe": {
     "columns": [
       {
@@ -17,6 +17,11 @@
         "ordinal": 2,
         "name": "name",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "send_to_devices",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -27,8 +32,9 @@
     "nullable": [
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "fcb70ce1f947fff8f3f9885c66374596dc8e01a7f38cf573a3ea299388b04989"
+  "hash": "76acb9b5f542db311fca3d9ff9e497986efe797b0e01d3b170cd71a628d9b25f"
 }

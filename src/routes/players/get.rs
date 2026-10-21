@@ -1,8 +1,9 @@
 use super::{PlayerAffiliation, PlayerResponse};
 use crate::proto::alleycat::device::{DevicePlayerAffiliation, DevicePlayerResponse};
-use crate::routes::errors::database_error;
-use crate::routes::pagination::{Pagination, PaginationQuery};
-use crate::routes::protobuf::ProtobufBody;
+use crate::routes::helpers::device_display::display_text;
+use crate::routes::helpers::errors::database_error;
+use crate::routes::helpers::pagination::{Pagination, PaginationQuery};
+use crate::routes::helpers::protobuf::ProtobufBody;
 use actix_web::get;
 use actix_web::{HttpResponse, error, web};
 use prost::Message;
@@ -150,7 +151,7 @@ pub async fn get_player_by_pin(
 
 #[utoipa::path(
     tag = "Players", summary = "Get device player details by PIN (protobuf)",
-    description = "Returns binary alleycat.device.DevicePlayerResponse from the active event. Includes current affiliation assignments with category and affiliation IDs and names. This separate device message has no email field. Preserve leading zeros in the PIN. Inactive players are returned with active=false so devices can show their status. GET has no request body. See /docs/device-apis#alleycat.device.DevicePlayerResponse for the message contract.",
+    description = "Returns binary alleycat.device.DevicePlayerResponse from the active event, including inactive registrations. Only affiliations in categories enabled for devices are included. Preserve leading zeros in the path PIN. GET has no request body. See /docs/device-apis#alleycat.device.DevicePlayerResponse for fields, UUID encoding, and PDN display constraints.",
     params(("pin" = String, Path, description = "Exactly four ASCII digits, e.g. 0001")),
     responses((status = 200, description = "Device player details", body = inline(ProtobufBody), content_type = "application/protobuf"),
         (status = 400, description = "Invalid PIN format", body = String, content_type = "text/plain"),
@@ -163,10 +164,9 @@ pub async fn get_device_player_by_pin(
     pool: web::Data<PgPool>,
 ) -> actix_web::Result<HttpResponse> {
     validate_pin(&pin)?;
-    // Select only device-visible fields; email is never loaded on this path.
+    // Select only device-visible fields; staff details are never loaded on this path.
     let row = sqlx::query!(
-        r#"SELECT p.id, p.event_id, p.pdn_code, p.name, p.created_at, p.team_id,
-                  t.name AS "team_name?", p.active,
+        r#"SELECT p.id, p.name, p.team_id, t.name AS "team_name?",
             COALESCE((
                 SELECT jsonb_agg(jsonb_build_object(
                     'category_id', c.id, 'category_name', c.name,
@@ -176,6 +176,7 @@ pub async fn get_device_player_by_pin(
                 JOIN affiliation_categories c ON c.id = pa.category_id AND c.event_id = pa.event_id
                 JOIN affiliations a ON a.id = pa.affiliation_id AND a.category_id = pa.category_id AND a.event_id = pa.event_id
                 WHERE pa.player_id = p.id AND pa.event_id = p.event_id
+                  AND c.send_to_devices
             ), '[]'::jsonb) AS "affiliations!: sqlx::types::Json<Vec<PlayerAffiliation>>"
            FROM players p LEFT JOIN teams t ON t.id = p.team_id AND t.event_id = p.event_id
            WHERE p.event_id = (SELECT active_event_id FROM app_state WHERE id = 1)
@@ -187,23 +188,19 @@ pub async fn get_device_player_by_pin(
     .map_err(|error| database_error(error, "Failed to retrieve player"))?
     .ok_or_else(|| error::ErrorNotFound("Player not found in the active event"))?;
     let message = DevicePlayerResponse {
-        id: row.id.to_string(),
-        event_id: row.event_id.to_string(),
-        pdn_code: row.pdn_code,
-        name: row.name,
-        created_at_unix_ms: row.created_at.timestamp_millis(),
-        team_id: row.team_id.map(|id| id.to_string()),
-        team_name: row.team_name,
-        active: row.active,
+        id: row.id.as_bytes().to_vec(),
+        name: display_text(&row.name),
+        team_id: row.team_id.map(|id| id.as_bytes().to_vec()),
+        team_name: row.team_name.as_deref().map(display_text),
         affiliations: row
             .affiliations
             .0
             .into_iter()
             .map(|assignment| DevicePlayerAffiliation {
-                category_id: assignment.category_id.to_string(),
-                category_name: assignment.category_name,
-                affiliation_id: assignment.affiliation_id.to_string(),
-                affiliation_name: assignment.affiliation_name,
+                category_id: assignment.category_id.as_bytes().to_vec(),
+                category_name: display_text(&assignment.category_name),
+                affiliation_id: assignment.affiliation_id.as_bytes().to_vec(),
+                affiliation_name: display_text(&assignment.affiliation_name),
             })
             .collect(),
     };

@@ -16,7 +16,6 @@ Run the same consistency checks as CI without rewriting generated files:
 
 ```bash
 cargo xtask docs db --check --check-reset
-SQLX_OFFLINE=true cargo test --test documentation
 ```
 
 The command starts a disposable PostgreSQL 18 container with no external network,
@@ -64,9 +63,3 @@ and served at `/docs/device-apis`. Normal application builds use the committed H
 
 Run `cargo xtask docs proto --check` to check for stale output without rewriting it.
 CI runs the same check.
-
-## API documentation tests
-
-`SQLX_OFFLINE=true cargo test --test documentation` checks the API contracts,
-documentation assets, and navigation links without a database. These tests also
-run in CI.

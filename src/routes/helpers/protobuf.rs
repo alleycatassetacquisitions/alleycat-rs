@@ -4,9 +4,9 @@ use prost::Message;
 // Describe the wire payload as binary, rather than a JSON array of byte values.
 #[derive(utoipa::ToSchema)]
 #[schema(value_type = String, format = Binary)]
-pub(super) struct ProtobufBody(());
+pub(in crate::routes) struct ProtobufBody(());
 
-pub(super) fn decode<M: Message + Default>(
+pub(in crate::routes) fn decode<M: Message + Default>(
     request: &HttpRequest,
     body: &[u8],
 ) -> actix_web::Result<M> {

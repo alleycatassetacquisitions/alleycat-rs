@@ -58,6 +58,7 @@ CREATE TABLE public.affiliation_categories (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     event_id uuid NOT NULL,
     name text NOT NULL,
+    send_to_devices boolean DEFAULT false NOT NULL,
     CONSTRAINT affiliation_categories_name_check CHECK (((name <> ''::text) AND (name = btrim(name)) AND (char_length(name) <= 256)))
 );
 
@@ -67,6 +68,13 @@ CREATE TABLE public.affiliation_categories (
 --
 
 COMMENT ON TABLE public.affiliation_categories IS 'Operator-defined affiliation categories within an event. No seeded categories or implied gameplay behavior.';
+
+
+--
+-- Name: COLUMN affiliation_categories.send_to_devices; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.affiliation_categories.send_to_devices IS 'Include assignments in this category in device player lookups. Defaults to false; staff responses always include all assignments.';
 
 
 --

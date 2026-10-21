@@ -1,7 +1,7 @@
 use super::PlayerResponse;
 use crate::domain::{NewPlayer, PlayerEmail, PlayerName};
 use crate::events::lock_active_event;
-use crate::routes::errors::database_error;
+use crate::routes::helpers::errors::database_error;
 use actix_web::post;
 use actix_web::{HttpResponse, web};
 use chrono::Utc;

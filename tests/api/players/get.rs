@@ -3,6 +3,7 @@ use alleycat_rs::proto::alleycat::device::DevicePlayerResponse;
 use prost::Message;
 use reqwest::Method;
 use serde_json::{Value, json};
+use uuid::Uuid;
 
 #[tokio::test]
 async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_email() {
@@ -31,17 +32,14 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
             .any(|window| window == b"private-address@example.com")
     );
     let device = DevicePlayerResponse::decode(bytes).unwrap();
-    assert_eq!(device.id, first["id"].as_str().unwrap());
-    assert_eq!(device.event_id, first["event_id"].as_str().unwrap());
-    assert_eq!(device.pdn_code, pin);
+    assert_eq!(
+        Uuid::from_slice(&device.id).unwrap(),
+        Uuid::parse_str(first["id"].as_str().unwrap()).unwrap()
+    );
     assert_eq!(device.name, "Alex");
     assert_eq!(device.team_id, None);
     assert_eq!(device.team_name, None);
-    assert!(device.active);
     assert!(device.affiliations.is_empty());
-    let created: chrono::DateTime<chrono::Utc> =
-        first["created_at"].as_str().unwrap().parse().unwrap();
-    assert_eq!(device.created_at_unix_ms, created.timestamp_millis());
 
     let team_response = app
         .request_json(Method::POST, "/teams", json!({"name": "Runners"}))
@@ -61,7 +59,7 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
         app.request_json(
             Method::PATCH,
             &format!("/teams/{}", team["id"].as_str().unwrap()),
-            json!({"name": "Renamed team"})
+            json!({"name": "Renaméd\tteam"})
         )
         .await
         .status(),
@@ -69,12 +67,14 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
     );
     let device =
         DevicePlayerResponse::decode(app.get(&device_path).await.bytes().await.unwrap()).unwrap();
-    assert_eq!(device.team_id.as_deref(), team["id"].as_str());
-    assert_eq!(device.team_name.as_deref(), Some("Renamed team"));
-    assert!(!device.active);
+    assert_eq!(
+        Uuid::from_slice(device.team_id.as_deref().unwrap()).unwrap(),
+        Uuid::parse_str(team["id"].as_str().unwrap()).unwrap()
+    );
+    assert_eq!(device.team_name.as_deref(), Some("Renamed?team"));
     let response = app.get(&pin_path).await;
     let by_pin: Value = assert_json(response, 200).await;
-    assert_eq!(by_pin["team_name"], "Renamed team");
+    assert_eq!(by_pin["team_name"], "Renaméd\tteam");
     assert_eq!(by_pin["email"], first["email"]);
 
     app.activate_new_event().await;
@@ -88,7 +88,10 @@ async fn lookup_by_id_or_pin_uses_the_active_event_and_device_responses_omit_ema
     );
     let device =
         DevicePlayerResponse::decode(app.get(&device_path).await.bytes().await.unwrap()).unwrap();
-    assert_eq!(device.id, second["id"].as_str().unwrap());
+    assert_eq!(
+        Uuid::from_slice(&device.id).unwrap(),
+        Uuid::parse_str(second["id"].as_str().unwrap()).unwrap()
+    );
     for path in ["/players/by-pin/1", "/device/players/by-pin/abcd"] {
         assert_eq!(app.get(path).await.status(), 400);
     }

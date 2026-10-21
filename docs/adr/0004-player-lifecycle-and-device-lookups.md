@@ -1,6 +1,6 @@
 # 0004: Player lifecycle and device lookups
 
-- Status: Partially superseded by [0009](0009-active-event-match-uploads.md) for accepting uploads after an event switch. Other decisions remain in effect.
+- Status: Partially superseded by [0009](0009-active-event-match-uploads.md) for accepting uploads after an event switch and [0012](0012-current-pdn-constraints.md) for device response fields. Other decisions remain in effect.
 - Date: 2026-10-15
 
 ## Context

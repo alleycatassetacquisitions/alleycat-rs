@@ -1,14 +1,12 @@
 mod affiliations;
 mod device_logs;
 mod documentation;
-mod errors;
 mod events;
 mod game_state;
 #[path = "health_check.rs"]
 mod health;
-mod pagination;
+mod helpers;
 mod players;
-mod protobuf;
 mod quickdraw;
 mod score;
 mod scoring;

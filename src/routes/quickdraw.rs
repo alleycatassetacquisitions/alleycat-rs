@@ -3,7 +3,7 @@ use crate::proto::alleycat::device::{
     QuickdrawMatch, QuickdrawMatchErrorCode, QuickdrawMatchRejection, WriteQuickdrawMatchesRequest,
     WriteQuickdrawMatchesResponse,
 };
-use crate::routes::{
+use crate::routes::helpers::{
     errors::database_error,
     pagination::{Pagination, PaginationQuery},
     protobuf::{self, ProtobufBody},

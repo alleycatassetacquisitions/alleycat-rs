@@ -219,6 +219,7 @@ dependencies = [
  "chrono",
  "claims",
  "config",
+ "deunicode",
  "fake",
  "log",
  "prost",

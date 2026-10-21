@@ -1,5 +1,5 @@
-use crate::routes::errors::database_error;
-use crate::routes::pagination::{Pagination, PaginationQuery};
+use crate::routes::helpers::errors::database_error;
+use crate::routes::helpers::pagination::{Pagination, PaginationQuery};
 use actix_web::get;
 use actix_web::web;
 use chrono::{DateTime, Utc};
