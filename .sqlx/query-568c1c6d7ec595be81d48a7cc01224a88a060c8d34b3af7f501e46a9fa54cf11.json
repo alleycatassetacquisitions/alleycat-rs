@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO pdn_inspection_checks (inspection_id, screen, primary_button, secondary_button, haptics, leds, power_switch, input_jack, output_jack, housing)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "568c1c6d7ec595be81d48a7cc01224a88a060c8d34b3af7f501e46a9fa54cf11"
+}

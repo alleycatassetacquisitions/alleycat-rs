@@ -1,0 +1,106 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT ON (i.device_id) i.id, i.device_id, i.inspected_at, i.received_at, i.firmware_commit_hash, i.notes, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing\n         FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = ANY($1)\n         ORDER BY i.device_id, i.inspected_at DESC, i.received_at DESC, i.id DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "device_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "inspected_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "received_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "firmware_commit_hash",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "notes",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "screen",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "primary_button",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "secondary_button",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "haptics",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "leds",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 11,
+        "name": "power_switch",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 12,
+        "name": "input_jack",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 13,
+        "name": "output_jack",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 14,
+        "name": "housing",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "44522ba0a59d5e78e49c47722adea0c8708b6ba9c90970c0de649ea093bd4080"
+}

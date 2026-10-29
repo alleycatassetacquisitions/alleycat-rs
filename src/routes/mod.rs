@@ -1,5 +1,6 @@
 mod affiliations;
 mod device_logs;
+mod devices;
 mod documentation;
 mod events;
 mod game_state;
@@ -14,6 +15,7 @@ mod teams;
 mod version;
 
 pub use device_logs::*;
+pub use devices::*;
 pub use documentation::configure_documentation;
 pub use events::*;
 pub use game_state::*;

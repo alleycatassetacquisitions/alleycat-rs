@@ -109,6 +109,47 @@ CREATE TABLE public.app_state (
 
 
 --
+-- Name: device_inspections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.device_inspections (
+    id uuid NOT NULL,
+    device_id uuid NOT NULL,
+    device_kind text NOT NULL,
+    inspected_at timestamp with time zone NOT NULL,
+    received_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    firmware_commit_hash text,
+    notes text,
+    CONSTRAINT device_inspections_device_kind_check CHECK ((device_kind = 'pdn'::text)),
+    CONSTRAINT device_inspections_firmware_commit_hash_check CHECK ((((octet_length(firmware_commit_hash) >= 1) AND (octet_length(firmware_commit_hash) <= 64)) AND (btrim(firmware_commit_hash) <> ''::text))),
+    CONSTRAINT device_inspections_id_check CHECK ((id <> '00000000-0000-0000-0000-000000000000'::uuid)),
+    CONSTRAINT device_inspections_inspected_at_check CHECK (((inspected_at >= '1970-01-01 00:00:00+00'::timestamp with time zone) AND (inspected_at <= '9999-12-31 23:59:59.999+00'::timestamp with time zone))),
+    CONSTRAINT device_inspections_notes_check CHECK ((octet_length(notes) <= 2048))
+);
+
+
+--
+-- Name: TABLE device_inspections; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.device_inspections IS 'Saved condition checks. Each row is a complete snapshot; missing checks are unknown, never inherited from earlier inspections. API writes never replace an accepted inspection.';
+
+
+--
+-- Name: COLUMN device_inspections.inspected_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.device_inspections.inspected_at IS 'Client-reported check time in UTC. Latest condition uses this time, then received_at and ID descending to resolve ties.';
+
+
+--
+-- Name: COLUMN device_inspections.firmware_commit_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.device_inspections.firmware_commit_hash IS 'Firmware observed during this check, not a mutable device attribute. Null means not recorded.';
+
+
+--
 -- Name: device_logs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -129,6 +170,38 @@ CREATE TABLE public.device_logs (
     CONSTRAINT device_logs_reset_reason_check CHECK ((reset_reason >= 0)),
     CONSTRAINT device_logs_uptime_ms_check CHECK ((uptime_ms >= 0))
 );
+
+
+--
+-- Name: devices; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.devices (
+    id uuid NOT NULL,
+    id_label integer NOT NULL,
+    device_kind text DEFAULT 'pdn'::text NOT NULL,
+    hardware_version integer,
+    mac_address macaddr,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT devices_device_kind_check CHECK ((device_kind = 'pdn'::text)),
+    CONSTRAINT devices_hardware_version_check CHECK ((hardware_version > 0)),
+    CONSTRAINT devices_id_check CHECK ((id <> '00000000-0000-0000-0000-000000000000'::uuid)),
+    CONSTRAINT devices_id_label_check CHECK (((id_label >= 1) AND (id_label <= 9999)))
+);
+
+
+--
+-- Name: TABLE devices; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.devices IS 'Physical device inventory shared across events. IDs and printed labels identify devices independently of inspection history. Currently supports PDNs.';
+
+
+--
+-- Name: COLUMN devices.mac_address; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.devices.mac_address IS 'Optional 48-bit hardware address. Unique when known; not the permanent inventory identity.';
 
 
 --
@@ -186,6 +259,96 @@ CREATE TABLE public.events (
 --
 
 COMMENT ON COLUMN public.events.accepting_delayed_scores IS 'Reversible per-event switch, default true. When false, new matches from closed scoring periods are recorded as delayed_scores_disabled. Open-period scoring and previously accepted results are unchanged.';
+
+
+--
+-- Name: pdn_inspection_checks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pdn_inspection_checks (
+    inspection_id uuid NOT NULL,
+    device_kind text DEFAULT 'pdn'::text NOT NULL,
+    screen boolean,
+    primary_button boolean,
+    secondary_button boolean,
+    haptics boolean,
+    leds boolean,
+    power_switch boolean,
+    input_jack boolean,
+    output_jack boolean,
+    housing boolean,
+    CONSTRAINT pdn_inspection_checks_device_kind_check CHECK ((device_kind = 'pdn'::text))
+);
+
+
+--
+-- Name: TABLE pdn_inspection_checks; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.pdn_inspection_checks IS 'PDN component observations for one inspection. Shared identity, timestamps, firmware, and notes live in device_inspections. Other device classes can define their own checks.';
+
+
+--
+-- Name: COLUMN pdn_inspection_checks.screen; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdn_inspection_checks.screen IS 'True means working, false means failed, null means not checked during this inspection.';
+
+
+--
+-- Name: COLUMN pdn_inspection_checks.primary_button; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdn_inspection_checks.primary_button IS 'True means working, false means failed, null means not checked during this inspection.';
+
+
+--
+-- Name: COLUMN pdn_inspection_checks.secondary_button; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdn_inspection_checks.secondary_button IS 'True means working, false means failed, null means not checked during this inspection.';
+
+
+--
+-- Name: COLUMN pdn_inspection_checks.haptics; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdn_inspection_checks.haptics IS 'True means working, false means failed, null means not checked during this inspection.';
+
+
+--
+-- Name: COLUMN pdn_inspection_checks.leds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdn_inspection_checks.leds IS 'True means working, false means failed, null means not checked during this inspection.';
+
+
+--
+-- Name: COLUMN pdn_inspection_checks.power_switch; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdn_inspection_checks.power_switch IS 'True means working, false means failed, null means not checked during this inspection.';
+
+
+--
+-- Name: COLUMN pdn_inspection_checks.input_jack; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdn_inspection_checks.input_jack IS 'True means working, false means failed, null means not checked during this inspection.';
+
+
+--
+-- Name: COLUMN pdn_inspection_checks.output_jack; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdn_inspection_checks.output_jack IS 'True means working, false means failed, null means not checked during this inspection.';
+
+
+--
+-- Name: COLUMN pdn_inspection_checks.housing; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdn_inspection_checks.housing IS 'True means working, false means failed, null means not checked during this inspection.';
 
 
 --
@@ -413,6 +576,22 @@ ALTER TABLE ONLY public.app_state
 
 
 --
+-- Name: device_inspections device_inspections_id_device_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.device_inspections
+    ADD CONSTRAINT device_inspections_id_device_kind_key UNIQUE (id, device_kind);
+
+
+--
+-- Name: device_inspections device_inspections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.device_inspections
+    ADD CONSTRAINT device_inspections_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: device_logs device_logs_device_mac_crash_number_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -426,6 +605,38 @@ ALTER TABLE ONLY public.device_logs
 
 ALTER TABLE ONLY public.device_logs
     ADD CONSTRAINT device_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: devices devices_id_device_kind_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.devices
+    ADD CONSTRAINT devices_id_device_kind_key UNIQUE (id, device_kind);
+
+
+--
+-- Name: devices devices_id_label_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.devices
+    ADD CONSTRAINT devices_id_label_key UNIQUE (id_label);
+
+
+--
+-- Name: devices devices_mac_address_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.devices
+    ADD CONSTRAINT devices_mac_address_key UNIQUE (mac_address);
+
+
+--
+-- Name: devices devices_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.devices
+    ADD CONSTRAINT devices_pkey PRIMARY KEY (id);
 
 
 --
@@ -450,6 +661,14 @@ ALTER TABLE ONLY public.event_scoring_periods
 
 ALTER TABLE ONLY public.events
     ADD CONSTRAINT events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: pdn_inspection_checks pdn_inspection_checks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pdn_inspection_checks
+    ADD CONSTRAINT pdn_inspection_checks_pkey PRIMARY KEY (inspection_id);
 
 
 --
@@ -533,6 +752,13 @@ ALTER TABLE ONLY public.teams
 
 
 --
+-- Name: device_inspections_latest_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX device_inspections_latest_idx ON public.device_inspections USING btree (device_id, inspected_at DESC, received_at DESC, id DESC);
+
+
+--
 -- Name: event_scoring_periods_event_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -599,11 +825,27 @@ ALTER TABLE ONLY public.app_state
 
 
 --
+-- Name: device_inspections device_inspections_device_id_device_kind_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.device_inspections
+    ADD CONSTRAINT device_inspections_device_id_device_kind_fkey FOREIGN KEY (device_id, device_kind) REFERENCES public.devices(id, device_kind);
+
+
+--
 -- Name: event_scoring_periods event_scoring_periods_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.event_scoring_periods
     ADD CONSTRAINT event_scoring_periods_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id);
+
+
+--
+-- Name: pdn_inspection_checks pdn_inspection_checks_inspection_id_device_kind_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pdn_inspection_checks
+    ADD CONSTRAINT pdn_inspection_checks_inspection_id_device_kind_fkey FOREIGN KEY (inspection_id, device_kind) REFERENCES public.device_inspections(id, device_kind);
 
 
 --
