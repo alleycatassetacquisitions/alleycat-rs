@@ -44,6 +44,11 @@ jobs:
       - name: Run tests
         run: cargo test
 
+      - name: Test database backup and recovery
+        run: |
+          cargo test -p xtask
+          cargo test -p xtask whole_database_recovery -- --ignored --nocapture
+
       - name: Check generated database docs and reset inventory
         run: cargo xtask docs db --check --check-reset
 

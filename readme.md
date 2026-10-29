@@ -155,8 +155,9 @@ cargo xtask cloud db info     # Show installed and pending migrations.
 cargo xtask cloud db migrate  # Apply pending migrations without resetting data.
 ```
 
-Remote database commands require Docker. They build `Dockerfile.migrations`
-using cached layers, then run its tools against `REMOTE_DB_URL`. The same
+Remote database commands require Docker. Migration, info, seed and reset build
+`Dockerfile.migrations` using cached layers, then run its tools against
+`REMOTE_DB_URL`. The same
 Dockerfile serves local Compose migrations; the application Dockerfile no
 longer includes the migration tools. Connection credentials are passed at
 runtime, not baked into the image.
@@ -172,6 +173,11 @@ Both commands require typing the database name to confirm. For automation,
 set `CONFIRM_REMOTE_DB_SEED` or `CONFIRM_REMOTE_DB_RESET` in the shell to the
 exact database name. Reset does not back up or seed data. Never use reset
 for routine deployment or verification.
+
+### Back up and recover the database
+
+See [database backups and recovery](docs/database-backups.md) for whole-database
+SQL backups and restoration into an empty remote or local database.
 
 ## Native development
 

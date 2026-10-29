@@ -16,6 +16,6 @@ if [[ "${confirmation}" != "delete local instance" ]]; then
 fi
 
 "${SCRIPT_DIR}/backup_logs.sh"
-"${SCRIPT_DIR}/backup_db.sh"
+cargo xtask stack db backup
 
 docker compose down --volumes --remove-orphans

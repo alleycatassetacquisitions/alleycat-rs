@@ -1,5 +1,6 @@
 mod cloud;
 mod command;
+mod database;
 mod docs;
 mod env;
 mod native;
