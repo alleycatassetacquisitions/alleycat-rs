@@ -15,7 +15,7 @@ Click a command to edit its Rust file; click its script to see the behavior to p
 | [stack doctor](xtask/src/stack/doctor.rs) | Ready | Existing prerequisite checks; used by `stack start`. |
 | [stack start](xtask/src/stack/start.rs) | Ready | [start_local_instance.sh (before deletion)](https://github.com/alleycatassetacquisitions/alleycat-rs/blob/e4cea9d54dc8a43dfb794431884472c58fbe6368/scripts/start_local_instance.sh) |
 | [stack db seed](xtask/src/stack/db/seed.rs) | Partial: Compose seeding works; friendly preflight checks remain. | [seed_db.sh](scripts/seed_db.sh), Compose branch |
-| [stack db backup](xtask/src/stack/db/backup.rs) | TBD | [backup_db.sh](scripts/backup_db.sh) |
+| [stack db backup](xtask/src/database.rs) | Ready | Saves a timestamped SQL backup; also used by the local deletion script. |
 | [stack db reset](xtask/src/stack/db/reset.rs) | Ready | Confirms deletion, tears down the local stack and volumes, then builds, starts, migrates, and seeds. No backup. |
 | [stack logs](xtask/src/stack/logs/follow.rs) | Ready | Streams raw app logs without Compose colors or prefixes; pipe to a formatter if desired. |
 | [stack logs backup](xtask/src/stack/logs/backup.rs) | TBD | [backup_logs.sh](scripts/backup_logs.sh) |

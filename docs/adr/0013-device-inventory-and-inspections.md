@@ -37,5 +37,6 @@ operator interface remain follow-ups.
 
 - [Issue 56](https://github.com/alleycatassetacquisitions/alleycat-rs/issues/56)
 - [Device-specific schemas](0014-device-specific-inspection-schemas.md)
+- [Database backup and recovery](../database-backups.md)
 - [Protobuf contract](../../proto/device_api.proto) · [HTTP contracts](../../src/routes/devices/)
 - [Device schema](../database/schema/public.devices.md) · [Inspection schema](../database/schema/public.device_inspections.md)

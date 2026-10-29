@@ -1,7 +1,9 @@
 use super::target;
+use crate::database::{self, BackupArgs};
 use crate::project::project_root;
 use anyhow::{Context, Result, bail};
 use clap::Subcommand;
+use std::path::PathBuf;
 use std::{
     io::{self, Write},
     process::{Command as Process, Stdio},
@@ -12,6 +14,10 @@ const IMAGE: &str = "alleycat-remote-db-tools";
 
 #[derive(Subcommand)]
 pub enum Command {
+    /// Save the whole remote database as a timestamped SQL file.
+    Backup(BackupArgs),
+    /// Restore a trusted SQL backup into an empty REMOTE_DB_URL database.
+    Restore { file: PathBuf },
     /// Apply pending migrations to REMOTE_DB_URL without resetting data.
     Migrate,
     /// Show applied and pending remote migrations.
@@ -25,6 +31,15 @@ pub enum Command {
 pub fn run(command: Command) -> Result<()> {
     let url = target::database()?;
     println!("Remote database: {}{}", url.host_str().unwrap(), url.path());
+    match command {
+        Command::Backup(args) => {
+            return database::backup(database::cloud_client(&url, "pg_dump"), args).map(|_| ());
+        }
+        Command::Restore { file } => {
+            return database::restore(database::cloud_client(&url, "psql"), &file);
+        }
+        _ => (),
+    }
     match command {
         Command::Reset => confirm(
             &url,
@@ -40,6 +55,7 @@ pub fn run(command: Command) -> Result<()> {
     }
     build_image()?;
     match command {
+        Command::Backup(_) | Command::Restore { .. } => unreachable!(),
         Command::Migrate => {
             migrate(&url, "run")?;
             migrate(&url, "info")
