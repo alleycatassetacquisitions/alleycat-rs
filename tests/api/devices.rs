@@ -39,6 +39,73 @@ fn inspection(time: i64) -> CreateDeviceInspectionRequest {
     }
 }
 
+async fn concurrent_retries(
+    app: &crate::helpers::TestApp,
+    path: &str,
+    message: &impl prost::Message,
+) {
+    let (a, b, c, d) = tokio::join!(
+        app.post_protobuf(path, message),
+        app.post_protobuf(path, message),
+        app.post_protobuf(path, message),
+        app.post_protobuf(path, message),
+    );
+    for response in [a, b, c, d] {
+        let status = response.status();
+        assert_eq!(status, 204, "{path}: {}", response.text().await.unwrap());
+    }
+}
+
+#[tokio::test]
+async fn concurrent_device_retries_preserve_registration() {
+    let app = spawn_app().await;
+    // Race on fresh identities repeatedly; retries of a committed row do not
+    // exercise conflicts during insertion into the secondary unique indexes.
+    for label in 1..=32 {
+        let mut registration = device(label);
+        registration.hardware_version = Some(2);
+        registration.mac_address = Some(format!("aa:bb:cc:dd:ee:{label:02x}"));
+        concurrent_retries(&app, "/devices", &registration).await;
+        let path = device_path(&registration);
+        let original: Value = assert_json(app.get(&path).await, 200).await;
+        concurrent_retries(&app, "/devices", &registration).await;
+        let after: Value = assert_json(app.get(&path).await, 200).await;
+        assert_eq!(after, original);
+    }
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM devices")
+        .fetch_one(&app.db_pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 32);
+}
+
+#[tokio::test]
+async fn concurrent_inspection_retries_preserve_snapshots() {
+    let app = spawn_app().await;
+    let registration = device(1);
+    assert_eq!(
+        app.post_protobuf("/devices", &registration).await.status(),
+        204
+    );
+    let device_path = device_path(&registration);
+    let path = format!("{device_path}/inspections");
+    for time in 0..32 {
+        let report = inspection(time);
+        concurrent_retries(&app, &path, &report).await;
+        let original: Value = assert_json(app.get(&device_path).await, 200).await;
+        concurrent_retries(&app, &path, &report).await;
+        let after: Value = assert_json(app.get(&device_path).await, 200).await;
+        assert_eq!(after, original);
+    }
+    let counts: (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM device_inspections), (SELECT count(*) FROM pdn_inspection_checks)",
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .unwrap();
+    assert_eq!(counts, (32, 32));
+}
+
 #[tokio::test]
 async fn devices_register_without_an_event_and_retries_preserve_identity() {
     let app = spawn_app().await;

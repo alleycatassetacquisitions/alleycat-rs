@@ -155,8 +155,10 @@ async fn ensure_device(
         hardware,
         mac,
     } = *device;
+    // Concurrent identical inserts can collide on any unique index. Check the
+    // saved fields below to distinguish retries from conflicting registrations.
     let inserted = sqlx::query_scalar!(
-        "INSERT INTO devices (id, id_label, hardware_version, mac_address) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING RETURNING id",
+        "INSERT INTO devices (id, id_label, hardware_version, mac_address) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING id",
         id, label, hardware, mac
     ).fetch_optional(&mut *connection).await.map_err(write_error)?;
     if inserted.is_none() {
@@ -195,9 +197,10 @@ async fn save_inspection(
     let id = value.id;
     let inspected_at = value.inspected_at;
     let checks = &value.checks;
+    // The (id, device_kind) unique index must also accept concurrent retries.
     let inserted = sqlx::query_scalar!(
         "INSERT INTO device_inspections (id, device_id, device_kind, inspected_at, firmware_commit_hash, notes)
-         VALUES ($1, $2, 'pdn', $3, $4, $5) ON CONFLICT (id) DO NOTHING RETURNING id",
+         VALUES ($1, $2, 'pdn', $3, $4, $5) ON CONFLICT DO NOTHING RETURNING id",
         id, device_id, inspected_at, value.firmware_commit_hash.as_deref(), value.notes.as_deref()
     ).fetch_optional(&mut *connection).await.map_err(write_error)?;
     if inserted.is_some() {
