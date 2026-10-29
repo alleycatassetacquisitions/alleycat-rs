@@ -13,4 +13,5 @@ mod quickdraw;
 mod score;
 mod scoring;
 mod scoring_routes;
+mod seed;
 mod teams;

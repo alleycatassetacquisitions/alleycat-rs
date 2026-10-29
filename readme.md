@@ -47,11 +47,11 @@ curl -i http://localhost:8000/health_check
 ```
 
 A healthy API returns `200 OK`. If you changed `APP_PORT`, use that port in the
-health-check URL. To add repeatable sample players and device
+health-check URL. To add repeatable sample players, quickdraw matches, and device
 logs:
 
 ```bash
-scripts/seed_db.sh
+cargo xtask stack db seed
 ```
 
 The seed creates a development event and selects it only if no event is active.
@@ -59,6 +59,15 @@ It adds Hunter and Bounty teams with stable UUIDs; reseeding preserves their
 names and existing player memberships. It also adds Allegiance and Faction
 choices for that development event, preserving renamed choices and existing
 affiliation assignments when rerun.
+
+On a fresh development event, the seed provides 50 players and 123 quickdraw
+matches for metagame integration testing. Two players have 20 matches each,
+five have 15, thirty-two have 4, one has 3, and ten have none. All opponent
+pairings are unique. This is the largest match total that fits that player
+distribution. All matches count toward the scoreboard on a fresh seed, with
+varied draw times and winners. Rerunning the seed preserves saved match results,
+timestamps, and team snapshots. It leaves scoring settings and periods alone.
+Existing players and matches can make the event totals larger than these fixtures.
 
 ## API documentation
 
