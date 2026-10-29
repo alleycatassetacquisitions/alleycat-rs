@@ -11,7 +11,9 @@ Write an ADR for a significant choice about data ownership, persistence,
 consistency, system boundaries, or behavior that would be costly or surprising
 to change. Bug fixes, routine refactors, and small implementation details usually
 do not need one. Keep each record focused on one decision or a closely related
-set of decisions.
+set of decisions. Keep it to a few short paragraphs covering the decision and
+its meaningful tradeoffs. Omit implementation walkthroughs and repeated contract
+details.
 
 Use OpenAPI for current API contracts, the
 [generated database reference](../database/schema/README.md) for schema details, and the
@@ -50,3 +52,5 @@ context and rationale; typo fixes, clarifications, and repaired links are fine.
 | [0010: Accept valid matches from partially invalid batches](0010-partial-match-batch-acceptance.md) | Accepted | 2026-10-18 |
 | [0011: Player scoreboard](0011-player-scoreboard.md) | Accepted | 2026-10-18 |
 | [0012: Keep current PDN constraints at the device response boundary](0012-current-pdn-constraints.md) | Accepted | 2026-10-20 |
+| [0013: Keep physical devices and their inspection history across events](0013-device-inventory-and-inspections.md) | Accepted | 2026-10-28 |
+| [0014: Give each device kind its own inspection schema](0014-device-specific-inspection-schemas.md) | Accepted | 2026-10-28 |

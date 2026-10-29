@@ -6,7 +6,7 @@
     <title>Device APIs · Alleycat</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
+
     <style>
       body {
         width: 60em;
@@ -68,7 +68,7 @@
         text-indent: 0;  
       }
 
-       
+
       .field-table td:nth-child(1) {  
         width: 10em;
       }
@@ -82,7 +82,7 @@
         width: auto;
       }
 
-       
+
       .extension-table td:nth-child(1) {  
         width: 10em;
       }
@@ -99,7 +99,7 @@
         width: auto;
       }
 
-       
+
       .enum-table td:nth-child(1) {  
         width: 10em;
       }
@@ -110,12 +110,12 @@
         width: auto;
       }
 
-       
+
       .scalar-value-types-table tr {
         height: 3em;
       }
 
-       
+
       #toc-container ul {
         list-style-type: none;
         padding-left: 1em;
@@ -126,7 +126,7 @@
         font-weight: bold;
       }
 
-       
+
       .file-heading {
         width: 100%;
         display: table;
@@ -142,7 +142,7 @@
         display: table-cell;
       }
 
-       
+
       .badge {
         width: 1.6em;
         height: 1.6em;
@@ -162,7 +162,7 @@
       }
     </style>
 
-    
+
     <link rel="stylesheet" type="text/css" href="/docs/device-apis.css"/>
   </head>
 
@@ -177,145 +177,275 @@
 
     <div id="toc-container">
       <ul id="toc">
-        
-          
+
+
           <li>
             <a href="#device_api.proto">device_api.proto</a>
             <ul>
-              
+
+                <li>
+                  <a href="#alleycat.device.CreateDeviceInspectionRequest"><span class="badge">M</span>CreateDeviceInspectionRequest</a>
+                </li>
+
+                <li>
+                  <a href="#alleycat.device.CreateDeviceRequest"><span class="badge">M</span>CreateDeviceRequest</a>
+                </li>
+
                 <li>
                   <a href="#alleycat.device.DevicePlayerAffiliation"><span class="badge">M</span>DevicePlayerAffiliation</a>
                 </li>
-              
+
                 <li>
                   <a href="#alleycat.device.DevicePlayerResponse"><span class="badge">M</span>DevicePlayerResponse</a>
                 </li>
-              
+
+                <li>
+                  <a href="#alleycat.device.PdnComponentChecks"><span class="badge">M</span>PdnComponentChecks</a>
+                </li>
+
                 <li>
                   <a href="#alleycat.device.QuickdrawMatch"><span class="badge">M</span>QuickdrawMatch</a>
                 </li>
-              
+
                 <li>
                   <a href="#alleycat.device.QuickdrawMatchRejection"><span class="badge">M</span>QuickdrawMatchRejection</a>
                 </li>
-              
+
                 <li>
                   <a href="#alleycat.device.WriteDeviceLogRequest"><span class="badge">M</span>WriteDeviceLogRequest</a>
                 </li>
-              
+
+                <li>
+                  <a href="#alleycat.device.WriteDeviceReportRequest"><span class="badge">M</span>WriteDeviceReportRequest</a>
+                </li>
+
                 <li>
                   <a href="#alleycat.device.WriteQuickdrawMatchesRequest"><span class="badge">M</span>WriteQuickdrawMatchesRequest</a>
                 </li>
-              
+
                 <li>
                   <a href="#alleycat.device.WriteQuickdrawMatchesResponse"><span class="badge">M</span>WriteQuickdrawMatchesResponse</a>
                 </li>
-              
-              
+
+
+                <li>
+                  <a href="#alleycat.device.DeviceKind"><span class="badge">E</span>DeviceKind</a>
+                </li>
+
                 <li>
                   <a href="#alleycat.device.QuickdrawMatchErrorCode"><span class="badge">E</span>QuickdrawMatchErrorCode</a>
                 </li>
-              
-              
-              
+
+
+
             </ul>
           </li>
-        
+
         <li><a href="#scalar-value-types">Scalar Value Types</a></li>
       </ul>
     </div>
 
-    
-      
+
+
       <div class="file-heading">
         <h2 id="device_api.proto">device_api.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
 
-      
-        <h3 id="alleycat.device.DevicePlayerAffiliation">DevicePlayerAffiliation</h3>
-        <p>One current player assignment. Categories and affiliations belong to the</p><p>player's event. UUIDs use the 16-byte representation and names use the PDN</p><p>display profile described in DevicePlayerResponse. Use UUIDs for identity.</p>
 
-        
+        <h3 id="alleycat.device.CreateDeviceInspectionRequest">CreateDeviceInspectionRequest</h3>
+        <p>Complete inspection snapshot for WriteDeviceReportRequest or</p><p>POST /devices/{device_id}/inspections. Saved snapshots are never overwritten.</p>
+
+
           <table class="field-table">
             <thead>
               <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
             </thead>
             <tbody>
-              
+
+                <tr>
+                  <td>id</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Required non-nil UUID: exactly 16 bytes in RFC 9562 network order.
+Generate once per check; retain this UUID and the same contents for retries. </p></td>
+                </tr>
+
+                <tr>
+                  <td>inspected_at_unix_ms</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td>optional</td>
+                  <td><p>Required check time: UTC milliseconds since 1970-01-01, from 0 through
+253402300799999. Must not be in the future. Upload time is recorded separately. </p></td>
+                </tr>
+
+                <tr>
+                  <td>firmware_commit_hash</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>Optional firmware identifier at check time. Nonblank, at most 64 UTF-8 bytes,
+with no null characters. Stored unchanged. </p></td>
+                </tr>
+
+                <tr>
+                  <td>notes</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>Optional notes, at most 2048 UTF-8 bytes, with no null characters. </p></td>
+                </tr>
+
+                <tr>
+                  <td>pdn</td>
+                  <td><a href="#alleycat.device.PdnComponentChecks">PdnComponentChecks</a></td>
+                  <td></td>
+                  <td><p>Required for PDNs; must match the registered device kind. An empty message
+means no components were checked. Missing or unsupported payloads are rejected. </p></td>
+                </tr>
+
+            </tbody>
+          </table>
+
+
+
+
+
+        <h3 id="alleycat.device.CreateDeviceRequest">CreateDeviceRequest</h3>
+        <p>Device registration details, also accepted by POST /devices.</p><p>Firmware uploads include this message in WriteDeviceReportRequest.</p>
+
+
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+
+                <tr>
+                  <td>id</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Required permanent, non-nil UUID: exactly 16 bytes in RFC 9562 network order.
+Generate once and retain across reports and reboots; do not send UUID text. </p></td>
+                </tr>
+
+                <tr>
+                  <td>id_label</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Required printed inventory label, from 1 through 9999. Globally unique. </p></td>
+                </tr>
+
+                <tr>
+                  <td>hardware_version</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>optional</td>
+                  <td><p>Optional hardware revision, from 1 through 2147483647. Omit if unknown. </p></td>
+                </tr>
+
+                <tr>
+                  <td>mac_address</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>Optional 48-bit MAC: six colon-separated hexadecimal byte pairs.
+Case is ignored. Omit if unknown; an empty string is invalid. </p></td>
+                </tr>
+
+                <tr>
+                  <td>device_kind</td>
+                  <td><a href="#alleycat.device.DeviceKind">DeviceKind</a></td>
+                  <td></td>
+                  <td><p>Required: DEVICE_KIND_PDN. Unspecified and unknown values are rejected. </p></td>
+                </tr>
+
+            </tbody>
+          </table>
+
+
+
+
+
+        <h3 id="alleycat.device.DevicePlayerAffiliation">DevicePlayerAffiliation</h3>
+        <p>One current player assignment. Categories and affiliations belong to the</p><p>player's event. UUIDs use the 16-byte representation and names use the PDN</p><p>display profile described in DevicePlayerResponse. Use UUIDs for identity.</p>
+
+
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+
                 <tr>
                   <td>category_id</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>Category UUID. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>category_name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Current category name, such as Allegiance or Faction. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>affiliation_id</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>Affiliation UUID within this category. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>affiliation_name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Current affiliation name, such as Helix Industries. </p></td>
                 </tr>
-              
+
             </tbody>
           </table>
 
-          
 
-        
-      
+
+
+
         <h3 id="alleycat.device.DevicePlayerResponse">DevicePlayerResponse</h3>
         <p>Response for GET /device/players/by-pin/{pin}, application/protobuf.</p><p>No request body. The path PIN is exactly four ASCII digits, including leading</p><p>zeros, and is resolved in the active event. Invalid PIN format returns 400;</p><p>no active event or no matching player returns 404. Errors are plain text.</p><p>Includes inactive registrations, without exposing their status. Email, PIN,</p><p>event ID, creation time, and active status are not part of this response.</p><p>Current PDN display profile: control characters become ?, then display strings</p><p>are transliterated to ASCII. Unknown characters and any remaining non-printable</p><p>output become ?. The result is truncated to 255 bytes. Only printable ASCII</p><p>(0x20-0x7E) is sent; no null terminator is sent.</p><p>Stored names are unchanged. Display text may be empty or collide after conversion;</p><p>use UUIDs for identity. Firmware using C strings needs room for a terminator.</p><p>UUIDs are exactly 16 bytes in RFC 9562 network byte order: the byte pairs of</p><p>the canonical hexadecimal UUID, with hyphens removed (not little-endian GUIDs).</p>
 
-        
+
           <table class="field-table">
             <thead>
               <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
             </thead>
             <tbody>
-              
+
                 <tr>
                   <td>id</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>Player UUID. Stable for this registration. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>name</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Current player display name, using the PDN display profile above. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>team_id</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td>optional</td>
                   <td><p>Current team UUID, absent when unassigned. Not a match-time snapshot. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>team_name</td>
                   <td><a href="#string">string</a></td>
                   <td>optional</td>
                   <td><p>Current team name using the PDN display profile; absent when unassigned. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>affiliations</td>
                   <td><a href="#alleycat.device.DevicePlayerAffiliation">DevicePlayerAffiliation</a></td>
@@ -326,45 +456,125 @@ Unassigned and disabled categories are omitted. May be empty; there is no fixed
 count limit. Names reflect current renames and use the PDN display profile.
 These are membership details, not permissions or match-time scoring snapshots. </p></td>
                 </tr>
-              
+
             </tbody>
           </table>
 
-          
 
-        
-      
-        <h3 id="alleycat.device.QuickdrawMatch">QuickdrawMatch</h3>
-        <p></p>
 
-        
+
+
+        <h3 id="alleycat.device.PdnComponentChecks">PdnComponentChecks</h3>
+        <p>PDN observations: true means working, false means failed, absent means not checked.</p><p>Each snapshot stands alone; unchecked values never carry forward from older checks.</p>
+
+
           <table class="field-table">
             <thead>
               <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
             </thead>
             <tbody>
-              
+
+                <tr>
+                  <td>screen</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+
+                <tr>
+                  <td>primary_button</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+
+                <tr>
+                  <td>secondary_button</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+
+                <tr>
+                  <td>haptics</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+
+                <tr>
+                  <td>leds</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+
+                <tr>
+                  <td>power_switch</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+
+                <tr>
+                  <td>input_jack</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+
+                <tr>
+                  <td>output_jack</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+
+                <tr>
+                  <td>housing</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td>optional</td>
+                  <td><p> </p></td>
+                </tr>
+
+            </tbody>
+          </table>
+
+
+
+
+
+        <h3 id="alleycat.device.QuickdrawMatch">QuickdrawMatch</h3>
+        <p></p>
+
+
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+
                 <tr>
                   <td>id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Required UUID strings. Both devices must use the same shared match ID. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>player_a_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Required first participant&#39;s player UUID. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>player_b_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Required second participant&#39;s player UUID; must differ from player_a_id. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>player_a_team_id</td>
                   <td><a href="#string">string</a></td>
@@ -372,14 +582,14 @@ These are membership details, not permissions or match-time scoring snapshots. <
                   <td><p>Match-time snapshots supplied by the devices, not current membership.
 Omit for an unassigned player; a present value must be a valid team UUID. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>player_b_team_id</td>
                   <td><a href="#string">string</a></td>
                   <td>optional</td>
                   <td><p>Second participant&#39;s team UUID at match time. Omit for an unassigned player. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>player_a_draw_time_ms</td>
                   <td><a href="#uint64">uint64</a></td>
@@ -387,7 +597,7 @@ Omit for an unassigned player; a present value must be a valid team UUID. </p></
                   <td><p>Required despite proto3 optional: zero is valid, absence is not.
 Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>player_b_draw_time_ms</td>
                   <td><a href="#uint64">uint64</a></td>
@@ -395,14 +605,14 @@ Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
                   <td><p>Second participant&#39;s unsigned draw time in milliseconds. Required; zero is valid.
 Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>winner_player_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Required participant UUID. The server does not infer the winner from times. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>occurred_at_unix_ms</td>
                   <td><a href="#int64">int64</a></td>
@@ -411,76 +621,76 @@ Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
 Maximum 253402300799999.
 The first accepted upload supplies the timestamp and all other fields. </p></td>
                 </tr>
-              
+
             </tbody>
           </table>
 
-          
 
-        
-      
+
+
+
         <h3 id="alleycat.device.QuickdrawMatchRejection">QuickdrawMatchRejection</h3>
         <p>First detected error for one match. Fixing it may reveal another error.</p>
 
-        
+
           <table class="field-table">
             <thead>
               <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
             </thead>
             <tbody>
-              
+
                 <tr>
                   <td>match_index</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
                   <td><p>Zero-based request position. Use this to identify the entry; IDs may repeat. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>match_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p>Exact submitted ID, including an empty or malformed value when invalid. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>fields</td>
                   <td><a href="#string">string</a></td>
                   <td>repeated</td>
                   <td><p>QuickdrawMatch field names. SAME_PLAYER includes both participant ID fields. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>code</td>
                   <td><a href="#alleycat.device.QuickdrawMatchErrorCode">QuickdrawMatchErrorCode</a></td>
                   <td></td>
                   <td><p>Stable machine-readable reason. Clients must handle unknown future codes. </p></td>
                 </tr>
-              
+
             </tbody>
           </table>
 
-          
 
-        
-      
+
+
+
         <h3 id="alleycat.device.WriteDeviceLogRequest">WriteDeviceLogRequest</h3>
         <p>Request body for POST /device-logs.</p><p>The server generates:</p><p>- id</p><p>- received_at</p>
 
-        
+
           <table class="field-table">
             <thead>
               <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
             </thead>
             <tbody>
-              
+
                 <tr>
                   <td>device_mac</td>
                   <td><a href="#string">string</a></td>
                   <td>optional</td>
                   <td><p>Required by the server. Colon-separated 48-bit address, such as &#34;aa:bb:cc:dd:ee:ff&#34;. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>crash_number</td>
                   <td><a href="#uint64">uint64</a></td>
@@ -488,7 +698,7 @@ The first accepted upload supplies the timestamp and all other fields. </p></td>
                   <td><p>Required by the server. Device-assigned crash report number. Zero is valid.
 Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>uptime_ms</td>
                   <td><a href="#uint64">uint64</a></td>
@@ -496,14 +706,14 @@ Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
                   <td><p>Required by the server. Milliseconds since the device booted. Zero is valid.
 Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>software_version</td>
                   <td><a href="#string">string</a></td>
                   <td>optional</td>
                   <td><p>Firmware/software build identifier. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>reset_reason</td>
                   <td><a href="#uint32">uint32</a></td>
@@ -511,69 +721,101 @@ Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
                   <td><p>Required by the server. Raw numeric reset-reason code reported by the device.
 Must fit a signed 32-bit integer (maximum 2147483647). Zero is valid. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>program_counter</td>
                   <td><a href="#fixed32">fixed32</a></td>
                   <td>optional</td>
                   <td><p>Address of the instruction being executed when the exception occurred. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>exception_cause</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>optional</td>
                   <td><p>Raw numeric exception-cause code. </p></td>
                 </tr>
-              
+
                 <tr>
                   <td>task_name</td>
                   <td><a href="#string">string</a></td>
                   <td>optional</td>
                   <td><p>FreeRTOS task active when the exception occurred. </p></td>
                 </tr>
-              
+
             </tbody>
           </table>
 
-          
 
-        
-      
-        <h3 id="alleycat.device.WriteQuickdrawMatchesRequest">WriteQuickdrawMatchesRequest</h3>
-        <p>POST /quickdraw-matches, application/protobuf.</p><p>Upload completed matches for the active event. 204 means all entries were</p><p>accepted; 200 returns WriteQuickdrawMatchesResponse with rejected entries.</p><p>See the HTTP API docs for request-wide errors and scoring behavior.</p>
 
-        
+
+
+        <h3 id="alleycat.device.WriteDeviceReportRequest">WriteDeviceReportRequest</h3>
+        <p>Registers a device if needed and saves its inspection atomically.</p><p>Used by POST /device-reports; see the HTTP API docs for responses and retries.</p>
+
+
           <table class="field-table">
             <thead>
               <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
             </thead>
             <tbody>
-              
+
+                <tr>
+                  <td>device</td>
+                  <td><a href="#alleycat.device.CreateDeviceRequest">CreateDeviceRequest</a></td>
+                  <td></td>
+                  <td><p>Required registration details. Existing fields must match, including the
+presence of optional fields. Reports never update registration metadata. </p></td>
+                </tr>
+
+                <tr>
+                  <td>inspection</td>
+                  <td><a href="#alleycat.device.CreateDeviceInspectionRequest">CreateDeviceInspectionRequest</a></td>
+                  <td></td>
+                  <td><p>Required condition snapshot for this device. </p></td>
+                </tr>
+
+            </tbody>
+          </table>
+
+
+
+
+
+        <h3 id="alleycat.device.WriteQuickdrawMatchesRequest">WriteQuickdrawMatchesRequest</h3>
+        <p>POST /quickdraw-matches, application/protobuf.</p><p>Upload completed matches for the active event. 204 means all entries were</p><p>accepted; 200 returns WriteQuickdrawMatchesResponse with rejected entries.</p><p>See the HTTP API docs for request-wide errors and scoring behavior.</p>
+
+
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+
                 <tr>
                   <td>matches</td>
                   <td><a href="#alleycat.device.QuickdrawMatch">QuickdrawMatch</a></td>
                   <td>repeated</td>
                   <td><p>Required batch of 1-100 completed matches. Maximum encoded request body: 256 KiB. </p></td>
                 </tr>
-              
+
             </tbody>
           </table>
 
-          
 
-        
-      
+
+
+
         <h3 id="alleycat.device.WriteQuickdrawMatchesResponse">WriteQuickdrawMatchesResponse</h3>
         <p>Response body for HTTP 200 from POST /quickdraw-matches, application/protobuf.</p><p>Retrying the same IDs is safe: the first accepted report is never overwritten.</p>
 
-        
+
           <table class="field-table">
             <thead>
               <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
             </thead>
             <tbody>
-              
+
                 <tr>
                   <td>rejected</td>
                   <td><a href="#alleycat.device.QuickdrawMatchRejection">QuickdrawMatchRejection</a></td>
@@ -581,16 +823,39 @@ Must fit a signed 32-bit integer (maximum 2147483647). Zero is valid. </p></td>
                   <td><p>One rejection per failed entry, in request order; may include every entry.
 Entries not listed were saved or already stored. </p></td>
                 </tr>
-              
+
             </tbody>
           </table>
 
-          
 
-        
-      
 
-      
+
+
+
+
+        <h3 id="alleycat.device.DeviceKind">DeviceKind</h3>
+        <p>Supported inventory device kinds.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+
+              <tr>
+                <td>DEVICE_KIND_UNSPECIFIED</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+
+              <tr>
+                <td>DEVICE_KIND_PDN</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+
+          </tbody>
+        </table>
+
         <h3 id="alleycat.device.QuickdrawMatchErrorCode">QuickdrawMatchErrorCode</h3>
         <p>Reasons for rejecting an individual match.</p>
         <table class="enum-table">
@@ -598,57 +863,57 @@ Entries not listed were saved or already stored. </p></td>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>
           </thead>
           <tbody>
-            
+
               <tr>
                 <td>QUICKDRAW_MATCH_ERROR_CODE_UNSPECIFIED</td>
                 <td>0</td>
                 <td><p>Unspecified/default value; never emitted by the server.</p></td>
               </tr>
-            
+
               <tr>
                 <td>QUICKDRAW_MATCH_ERROR_CODE_INVALID_UUID</td>
                 <td>1</td>
                 <td><p>A required UUID is missing/malformed, or a present optional UUID is malformed.</p></td>
               </tr>
-            
+
               <tr>
                 <td>QUICKDRAW_MATCH_ERROR_CODE_MISSING_FIELD</td>
                 <td>2</td>
                 <td><p>A required draw time or occurrence timestamp is absent.</p></td>
               </tr>
-            
+
               <tr>
                 <td>QUICKDRAW_MATCH_ERROR_CODE_OUT_OF_RANGE</td>
                 <td>3</td>
                 <td><p>A measurement or timestamp is outside its documented numeric range.</p></td>
               </tr>
-            
+
               <tr>
                 <td>QUICKDRAW_MATCH_ERROR_CODE_SAME_PLAYER</td>
                 <td>4</td>
                 <td><p>Both participant UUIDs are equal.</p></td>
               </tr>
-            
+
               <tr>
                 <td>QUICKDRAW_MATCH_ERROR_CODE_INVALID_WINNER</td>
                 <td>5</td>
                 <td><p>The winner UUID is neither participant.</p></td>
               </tr>
-            
+
               <tr>
                 <td>QUICKDRAW_MATCH_ERROR_CODE_INVALID_EVENT_REFERENCE</td>
                 <td>6</td>
                 <td><p>A player/team ID is unknown or belongs to another event.</p></td>
               </tr>
-            
+
           </tbody>
         </table>
-      
 
-      
 
-      
-    
+
+
+
+
 
     <h2 id="scalar-value-types">Scalar Value Types</h2>
     <table class="scalar-value-types-table">
@@ -656,7 +921,7 @@ Entries not listed were saved or already stored. </p></td>
         <tr><td>.proto Type</td><td>Notes</td><td>C++</td><td>Java</td><td>Python</td><td>Go</td><td>C#</td><td>PHP</td><td>Ruby</td></tr>
       </thead>
       <tbody>
-        
+
           <tr id="double">
             <td>double</td>
             <td></td>
@@ -668,7 +933,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>float</td>
             <td>Float</td>
           </tr>
-        
+
           <tr id="float">
             <td>float</td>
             <td></td>
@@ -680,7 +945,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>float</td>
             <td>Float</td>
           </tr>
-        
+
           <tr id="int32">
             <td>int32</td>
             <td>Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint32 instead.</td>
@@ -692,7 +957,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer</td>
             <td>Bignum or Fixnum (as required)</td>
           </tr>
-        
+
           <tr id="int64">
             <td>int64</td>
             <td>Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint64 instead.</td>
@@ -704,7 +969,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer/string</td>
             <td>Bignum</td>
           </tr>
-        
+
           <tr id="uint32">
             <td>uint32</td>
             <td>Uses variable-length encoding.</td>
@@ -716,7 +981,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer</td>
             <td>Bignum or Fixnum (as required)</td>
           </tr>
-        
+
           <tr id="uint64">
             <td>uint64</td>
             <td>Uses variable-length encoding.</td>
@@ -728,7 +993,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer/string</td>
             <td>Bignum or Fixnum (as required)</td>
           </tr>
-        
+
           <tr id="sint32">
             <td>sint32</td>
             <td>Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int32s.</td>
@@ -740,7 +1005,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer</td>
             <td>Bignum or Fixnum (as required)</td>
           </tr>
-        
+
           <tr id="sint64">
             <td>sint64</td>
             <td>Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int64s.</td>
@@ -752,7 +1017,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer/string</td>
             <td>Bignum</td>
           </tr>
-        
+
           <tr id="fixed32">
             <td>fixed32</td>
             <td>Always four bytes. More efficient than uint32 if values are often greater than 2^28.</td>
@@ -764,7 +1029,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer</td>
             <td>Bignum or Fixnum (as required)</td>
           </tr>
-        
+
           <tr id="fixed64">
             <td>fixed64</td>
             <td>Always eight bytes. More efficient than uint64 if values are often greater than 2^56.</td>
@@ -776,7 +1041,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer/string</td>
             <td>Bignum</td>
           </tr>
-        
+
           <tr id="sfixed32">
             <td>sfixed32</td>
             <td>Always four bytes.</td>
@@ -788,7 +1053,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer</td>
             <td>Bignum or Fixnum (as required)</td>
           </tr>
-        
+
           <tr id="sfixed64">
             <td>sfixed64</td>
             <td>Always eight bytes.</td>
@@ -800,7 +1065,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>integer/string</td>
             <td>Bignum</td>
           </tr>
-        
+
           <tr id="bool">
             <td>bool</td>
             <td></td>
@@ -812,7 +1077,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>boolean</td>
             <td>TrueClass/FalseClass</td>
           </tr>
-        
+
           <tr id="string">
             <td>string</td>
             <td>A string must always contain UTF-8 encoded or 7-bit ASCII text.</td>
@@ -824,7 +1089,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>string</td>
             <td>String (UTF-8)</td>
           </tr>
-        
+
           <tr id="bytes">
             <td>bytes</td>
             <td>May contain any arbitrary sequence of bytes.</td>
@@ -836,7 +1101,7 @@ Entries not listed were saved or already stored. </p></td>
             <td>string</td>
             <td>String (ASCII-8BIT)</td>
           </tr>
-        
+
       </tbody>
     </table>
   </body>

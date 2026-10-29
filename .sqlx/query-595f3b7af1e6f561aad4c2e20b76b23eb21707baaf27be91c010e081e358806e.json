@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO device_inspections (id, device_id, device_kind, inspected_at, firmware_commit_hash, notes)\n         VALUES ($1, $2, 'pdn', $3, $4, $5) ON CONFLICT (id) DO NOTHING RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "595f3b7af1e6f561aad4c2e20b76b23eb21707baaf27be91c010e081e358806e"
+}

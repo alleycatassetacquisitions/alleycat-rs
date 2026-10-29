@@ -24,6 +24,9 @@ do not edit these files manually.
 | [public.affiliation_categories](public.affiliation_categories.md) | 4 | Operator-defined affiliation categories within an event. No seeded categories or implied gameplay behavior. | BASE TABLE |
 | [public.affiliations](public.affiliations.md) | 4 | Operator-defined affiliations within a category. Names have no implicit gameplay or permission behavior. | BASE TABLE |
 | [public.player_affiliations](public.player_affiliations.md) | 4 | At most one affiliation per player per category. Composite foreign keys keep player, category, and affiliation in the same event. Clearing an assignment deletes its row; changes do not affect scores. | BASE TABLE |
+| [public.devices](public.devices.md) | 6 | Physical device inventory shared across events. IDs and printed labels identify devices independently of inspection history. Currently supports PDNs. | BASE TABLE |
+| [public.device_inspections](public.device_inspections.md) | 7 | Saved condition checks. Each row is a complete snapshot; missing checks are unknown, never inherited from earlier inspections. API writes never replace an accepted inspection. | BASE TABLE |
+| [public.pdn_inspection_checks](public.pdn_inspection_checks.md) | 11 | PDN component observations for one inspection. Shared identity, timestamps, firmware, and notes live in device_inspections. Other device classes can define their own checks. | BASE TABLE |
 
 ## Stored procedures and functions
 
@@ -60,6 +63,8 @@ erDiagram
 "public.affiliations" }o--|| "public.affiliation_categories" : "FOREIGN KEY (event_id, category_id) REFERENCES affiliation_categories(event_id, id)"
 "public.player_affiliations" }o--|| "public.players" : "FOREIGN KEY (event_id, player_id) REFERENCES players(event_id, id)"
 "public.player_affiliations" }o--|| "public.affiliations" : "FOREIGN KEY (event_id, category_id, affiliation_id) REFERENCES affiliations(event_id, category_id, id)"
+"public.device_inspections" }o--|| "public.devices" : "FOREIGN KEY (device_id, device_kind) REFERENCES devices(id, device_kind)"
+"public.pdn_inspection_checks" }o--|| "public.device_inspections" : "FOREIGN KEY (inspection_id, device_kind) REFERENCES device_inspections(id, device_kind)"
 
 "public.players" {
   uuid id
@@ -141,6 +146,36 @@ erDiagram
   uuid player_id FK
   uuid category_id FK
   uuid affiliation_id FK
+}
+"public.devices" {
+  uuid id
+  integer id_label
+  text device_kind
+  integer hardware_version
+  macaddr mac_address
+  timestamp_with_time_zone created_at
+}
+"public.device_inspections" {
+  uuid id
+  uuid device_id FK
+  text device_kind FK
+  timestamp_with_time_zone inspected_at
+  timestamp_with_time_zone received_at
+  text firmware_commit_hash
+  text notes
+}
+"public.pdn_inspection_checks" {
+  uuid inspection_id FK
+  text device_kind FK
+  boolean screen
+  boolean primary_button
+  boolean secondary_button
+  boolean haptics
+  boolean leds
+  boolean power_switch
+  boolean input_jack
+  boolean output_jack
+  boolean housing
 }
 ```
 

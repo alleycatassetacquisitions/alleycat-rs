@@ -1,12 +1,13 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::routes::{
     VersionInfo, configure_documentation, create_affiliation, create_affiliation_category,
-    create_event, create_team, get_device_logs, get_device_player_by_pin, get_game_state,
-    get_player, get_player_by_pin, get_player_scores, get_players, get_quickdraw_matches,
-    get_scoring, get_version, health_check, list_affiliation_categories, list_affiliations,
+    create_device, create_device_inspection, create_event, create_team, get_device,
+    get_device_logs, get_device_player_by_pin, get_game_state, get_player, get_player_by_pin,
+    get_player_scores, get_players, get_quickdraw_matches, get_scoring, get_version, health_check,
+    list_affiliation_categories, list_affiliations, list_device_inspections, list_devices,
     list_events, list_teams, register_player, rename_affiliation, rename_team, set_active_event,
     set_delayed_scores, set_scoring, update_affiliation_category, update_event, update_player,
-    write_device_log, write_quickdraw_matches,
+    write_device_log, write_device_report, write_quickdraw_matches,
 };
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
@@ -36,6 +37,12 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> Result<Server, std::io::Er
             .into_utoipa_app()
             .service(health_check)
             .service(get_version)
+            .service(write_device_report)
+            .service(create_device)
+            .service(create_device_inspection)
+            .service(list_devices)
+            .service(get_device)
+            .service(list_device_inspections)
             .service(get_device_logs)
             .service(write_device_log)
             .service(get_players)

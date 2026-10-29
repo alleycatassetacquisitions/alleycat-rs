@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO devices (id, id_label, hardware_version, mac_address) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Macaddr"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "337c2b90980b0349d5204dd9a8368567acadd16b26b49352173ab7f8c0eea60a"
+}

@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS(SELECT 1 FROM devices WHERE id = $1 AND device_kind = 'pdn' AND id_label = $2 AND hardware_version IS NOT DISTINCT FROM $3 AND mac_address IS NOT DISTINCT FROM $4) AS \"identical!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "identical!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Macaddr"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "84dcc26eb4d07de111182bd1bc5c1d68b4967fdb4c03af893ecd081877b3d7d9"
+}

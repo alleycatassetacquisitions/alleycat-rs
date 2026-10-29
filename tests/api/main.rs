@@ -3,6 +3,7 @@ mod affiliations;
 mod database_errors;
 mod database_timeouts;
 mod device_logs;
+mod devices;
 mod events;
 mod game_state;
 mod health_check;
