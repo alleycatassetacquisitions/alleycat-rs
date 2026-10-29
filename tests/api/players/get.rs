@@ -216,10 +216,10 @@ async fn development_seed_preserves_membership_after_team_rename() {
         .fetch_all(&app.db_pool)
         .await
         .unwrap();
-    assert_eq!(original.len(), 5);
+    assert_eq!(original.len(), 50);
     assert_eq!(
         original.iter().filter(|(_, team)| team.is_some()).count(),
-        4
+        49
     );
 
     sqlx::query("UPDATE teams SET name = name || ' renamed'")
