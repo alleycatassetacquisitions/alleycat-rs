@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT i.id, i.device_id, i.inspected_at, i.received_at, i.firmware_commit_hash, i.notes, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = $1\n         ORDER BY i.inspected_at DESC, i.received_at DESC, i.id DESC LIMIT $2 OFFSET $3",
+  "query": "SELECT i.id, i.device_id, i.inspected_at, i.received_at, i.firmware_commit_hash, i.notes, i.powers_on, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = $1\n         ORDER BY i.inspected_at DESC, i.received_at DESC, i.id DESC LIMIT $2 OFFSET $3",
   "describe": {
     "columns": [
       {
@@ -35,46 +35,51 @@
       },
       {
         "ordinal": 6,
-        "name": "screen",
+        "name": "powers_on",
         "type_info": "Bool"
       },
       {
         "ordinal": 7,
-        "name": "primary_button",
+        "name": "screen",
         "type_info": "Bool"
       },
       {
         "ordinal": 8,
-        "name": "secondary_button",
+        "name": "primary_button",
         "type_info": "Bool"
       },
       {
         "ordinal": 9,
-        "name": "haptics",
+        "name": "secondary_button",
         "type_info": "Bool"
       },
       {
         "ordinal": 10,
-        "name": "leds",
+        "name": "haptics",
         "type_info": "Bool"
       },
       {
         "ordinal": 11,
-        "name": "power_switch",
+        "name": "leds",
         "type_info": "Bool"
       },
       {
         "ordinal": 12,
-        "name": "input_jack",
+        "name": "power_switch",
         "type_info": "Bool"
       },
       {
         "ordinal": 13,
-        "name": "output_jack",
+        "name": "input_jack",
         "type_info": "Bool"
       },
       {
         "ordinal": 14,
+        "name": "output_jack",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 15,
         "name": "housing",
         "type_info": "Bool"
       }
@@ -101,8 +106,9 @@
       true,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "e842714950eed3ac072c43b62e94e0d1c68f8483b5de7aa387d1b1080cd54840"
+  "hash": "e7a6ac9606c86e9d5ca2be7392ce6e99c69bf7793f98c5ea11804b415b997883"
 }

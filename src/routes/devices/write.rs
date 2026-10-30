@@ -105,6 +105,7 @@ struct NewInspection {
     inspected_at: DateTime<Utc>,
     firmware_commit_hash: Option<String>,
     notes: Option<String>,
+    powers_on: Option<bool>,
     checks: PdnComponentChecks,
 }
 
@@ -141,6 +142,7 @@ impl TryFrom<CreateDeviceInspectionRequest> for NewInspection {
             checks,
             firmware_commit_hash: value.firmware_commit_hash,
             notes: value.notes,
+            powers_on: value.powers_on,
         })
     }
 }
@@ -199,9 +201,9 @@ async fn save_inspection(
     let checks = &value.checks;
     // The (id, device_kind) unique index must also accept concurrent retries.
     let inserted = sqlx::query_scalar!(
-        "INSERT INTO device_inspections (id, device_id, device_kind, inspected_at, firmware_commit_hash, notes)
-         VALUES ($1, $2, 'pdn', $3, $4, $5) ON CONFLICT DO NOTHING RETURNING id",
-        id, device_id, inspected_at, value.firmware_commit_hash.as_deref(), value.notes.as_deref()
+        "INSERT INTO device_inspections (id, device_id, device_kind, inspected_at, firmware_commit_hash, notes, powers_on)
+         VALUES ($1, $2, 'pdn', $3, $4, $5, $6) ON CONFLICT DO NOTHING RETURNING id",
+        id, device_id, inspected_at, value.firmware_commit_hash.as_deref(), value.notes.as_deref(), value.powers_on
     ).fetch_optional(&mut *connection).await.map_err(write_error)?;
     if inserted.is_some() {
         sqlx::query!(
@@ -223,9 +225,10 @@ async fn save_inspection(
              AND power_switch IS NOT DISTINCT FROM $11
              AND input_jack IS NOT DISTINCT FROM $12
              AND output_jack IS NOT DISTINCT FROM $13
-             AND housing IS NOT DISTINCT FROM $14) AS \"identical!\"",
+             AND housing IS NOT DISTINCT FROM $14
+             AND powers_on IS NOT DISTINCT FROM $15) AS \"identical!\"",
             id, device_id, inspected_at, value.firmware_commit_hash.as_deref(), value.notes.as_deref(),
-            checks.screen, checks.primary_button, checks.secondary_button, checks.haptics, checks.leds, checks.power_switch, checks.input_jack, checks.output_jack, checks.housing
+            checks.screen, checks.primary_button, checks.secondary_button, checks.haptics, checks.leds, checks.power_switch, checks.input_jack, checks.output_jack, checks.housing, value.powers_on
         ).fetch_one(&mut *connection).await.map_err(write_error)?;
         if !identical {
             return Err(error::ErrorConflict(

@@ -15,6 +15,7 @@ Saved condition checks. Each row is a complete snapshot; missing checks are unkn
 | received_at | timestamp with time zone | clock_timestamp() | false |  |  |  |
 | firmware_commit_hash | text |  | true |  |  | Firmware observed during this check, not a mutable device attribute. Null means not recorded. |
 | notes | text |  | true |  |  |  |
+| powers_on | boolean |  | true |  |  | Whether the device powered on during this inspection. True means it did, false means an attempted power-on failed, and null means not checked. Independent of component results; never inherited from older inspections. |
 
 ## Constraints
 
@@ -58,6 +59,7 @@ erDiagram
   timestamp_with_time_zone received_at
   text firmware_commit_hash
   text notes
+  boolean powers_on
 }
 "public.pdn_inspection_checks" {
   uuid inspection_id FK
