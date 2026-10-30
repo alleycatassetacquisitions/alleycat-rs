@@ -120,6 +120,7 @@ CREATE TABLE public.device_inspections (
     received_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     firmware_commit_hash text,
     notes text,
+    powers_on boolean,
     CONSTRAINT device_inspections_device_kind_check CHECK ((device_kind = 'pdn'::text)),
     CONSTRAINT device_inspections_firmware_commit_hash_check CHECK ((((octet_length(firmware_commit_hash) >= 1) AND (octet_length(firmware_commit_hash) <= 64)) AND (btrim(firmware_commit_hash) <> ''::text))),
     CONSTRAINT device_inspections_id_check CHECK ((id <> '00000000-0000-0000-0000-000000000000'::uuid)),
@@ -147,6 +148,13 @@ COMMENT ON COLUMN public.device_inspections.inspected_at IS 'Client-reported che
 --
 
 COMMENT ON COLUMN public.device_inspections.firmware_commit_hash IS 'Firmware observed during this check, not a mutable device attribute. Null means not recorded.';
+
+
+--
+-- Name: COLUMN device_inspections.powers_on; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.device_inspections.powers_on IS 'Whether the device powered on during this inspection. True means it did, false means an attempted power-on failed, and null means not checked. Independent of component results; never inherited from older inspections.';
 
 
 --

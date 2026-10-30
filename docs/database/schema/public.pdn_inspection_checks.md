@@ -64,6 +64,7 @@ erDiagram
   timestamp_with_time_zone received_at
   text firmware_commit_hash
   text notes
+  boolean powers_on
 }
 ```
 

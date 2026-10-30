@@ -32,7 +32,7 @@ async fn latest_inspections(
     ids: &[Uuid],
 ) -> actix_web::Result<HashMap<Uuid, Inspection>> {
     let rows = sqlx::query_as!(InspectionRow,
-        "SELECT DISTINCT ON (i.device_id) i.id, i.device_id, i.inspected_at, i.received_at, i.firmware_commit_hash, i.notes, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing
+        "SELECT DISTINCT ON (i.device_id) i.id, i.device_id, i.inspected_at, i.received_at, i.firmware_commit_hash, i.notes, i.powers_on, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing
          FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = ANY($1)
          ORDER BY i.device_id, i.inspected_at DESC, i.received_at DESC, i.id DESC", ids
     ).fetch_all(pool).await.map_err(|err| database_error(err, "Failed to read device inspections"))?;
@@ -130,7 +130,7 @@ pub async fn list_device_inspections(
     let pagination = parameters.normalize();
     let (limit, offset) = pagination.limit_offset();
     let inspections = sqlx::query_as!(InspectionRow,
-        "SELECT i.id, i.device_id, i.inspected_at, i.received_at, i.firmware_commit_hash, i.notes, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = $1
+        "SELECT i.id, i.device_id, i.inspected_at, i.received_at, i.firmware_commit_hash, i.notes, i.powers_on, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = $1
          ORDER BY i.inspected_at DESC, i.received_at DESC, i.id DESC LIMIT $2 OFFSET $3", *device_id, limit, offset
     ).fetch_all(pool.get_ref()).await.map_err(|err| database_error(err, "Failed to read device inspections"))?
         .into_iter().map(Inspection::from).collect();

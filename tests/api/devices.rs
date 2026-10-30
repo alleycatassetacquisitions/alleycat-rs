@@ -36,6 +36,7 @@ fn inspection(time: i64) -> CreateDeviceInspectionRequest {
         })),
         firmware_commit_hash: Some("26a3bc".into()),
         notes: Some("Button sticks — inspect after repair".into()),
+        powers_on: None,
     }
 }
 
@@ -223,6 +224,59 @@ async fn inspection_history_retains_failures_and_uses_check_time_not_upload_orde
 }
 
 #[tokio::test]
+async fn power_on_checks_preserve_history_unknowns_and_retry_contents() {
+    let app = spawn_app().await;
+    let registration = device(1);
+    assert_eq!(
+        app.post_protobuf("/devices", &registration).await.status(),
+        204
+    );
+    let path = device_path(&registration);
+    let history_path = format!("{path}/inspections");
+    let mut saved_history = Vec::new();
+
+    // A failed attempt, a successful repair, then an unchecked inspection.
+    // An omitted value must not inherit the previous successful observation.
+    for (time, powers_on) in [Some(false), Some(true), None].into_iter().enumerate() {
+        let report = CreateDeviceInspectionRequest {
+            powers_on,
+            ..inspection(time as i64)
+        };
+        assert_eq!(
+            app.post_protobuf(&history_path, &report).await.status(),
+            204
+        );
+        let current: Value = assert_json(app.get(&path).await, 200).await;
+        let saved = &current["latest_inspection"];
+        assert_eq!(saved["checks"].get("powers_on"), Some(&json!(powers_on)));
+        assert!(saved.get("powers_on").is_none());
+        assert!(saved["checks"]["components"].get("powers_on").is_none());
+        // Power-on and individual component observations remain independent.
+        assert_eq!(saved["checks"]["components"]["screen"], true);
+        assert_eq!(saved["checks"]["components"]["power_switch"], false);
+        saved_history.insert(0, saved.clone());
+
+        assert_eq!(
+            app.post_protobuf(&history_path, &report).await.status(),
+            204
+        );
+        for changed in [Some(false), Some(true), None] {
+            if changed != powers_on {
+                let conflict = CreateDeviceInspectionRequest {
+                    powers_on: changed,
+                    ..report.clone()
+                };
+                assert_text_error(app.post_protobuf(&history_path, &conflict).await, 409).await;
+            }
+        }
+        let history: Value = assert_json(app.get(&history_path).await, 200).await;
+        assert_eq!(history["inspections"], json!(saved_history));
+        let devices: Value = assert_json(app.get("/devices").await, 200).await;
+        assert_eq!(devices["devices"][0]["latest_inspection"], *saved);
+    }
+}
+
+#[tokio::test]
 async fn inspection_retries_are_idempotent_but_conflicting_content_is_rejected() {
     let app = spawn_app().await;
     let registration = device(1);
@@ -371,10 +425,10 @@ async fn unsupported_inspection_payloads_are_not_saved_as_unchecked_pdns() {
     let path = format!("{}/inspections", device_path(&registration));
     let mut report = inspection(0);
     report.checks = None;
-    // Simulate a future oneof variant: field 6, length-delimited empty payload.
+    // Simulate a future oneof variant: field 7, length-delimited empty payload.
     // Prost skips unknown fields, so the handler must require a recognized variant.
     let mut encoded = report.encode_to_vec();
-    encoded.extend_from_slice(&[0x32, 0x00]);
+    encoded.extend_from_slice(&[0x3a, 0x00]);
     let response = app
         .request(reqwest::Method::POST, &path)
         .header("Content-Type", "application/protobuf")

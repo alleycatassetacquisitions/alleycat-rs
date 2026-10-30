@@ -25,7 +25,7 @@ do not edit these files manually.
 | [public.affiliations](public.affiliations.md) | 4 | Operator-defined affiliations within a category. Names have no implicit gameplay or permission behavior. | BASE TABLE |
 | [public.player_affiliations](public.player_affiliations.md) | 4 | At most one affiliation per player per category. Composite foreign keys keep player, category, and affiliation in the same event. Clearing an assignment deletes its row; changes do not affect scores. | BASE TABLE |
 | [public.devices](public.devices.md) | 6 | Physical device inventory shared across events. IDs and printed labels identify devices independently of inspection history. Currently supports PDNs. | BASE TABLE |
-| [public.device_inspections](public.device_inspections.md) | 7 | Saved condition checks. Each row is a complete snapshot; missing checks are unknown, never inherited from earlier inspections. API writes never replace an accepted inspection. | BASE TABLE |
+| [public.device_inspections](public.device_inspections.md) | 8 | Saved condition checks. Each row is a complete snapshot; missing checks are unknown, never inherited from earlier inspections. API writes never replace an accepted inspection. | BASE TABLE |
 | [public.pdn_inspection_checks](public.pdn_inspection_checks.md) | 11 | PDN component observations for one inspection. Shared identity, timestamps, firmware, and notes live in device_inspections. Other device classes can define their own checks. | BASE TABLE |
 
 ## Stored procedures and functions
@@ -163,6 +163,7 @@ erDiagram
   timestamp_with_time_zone received_at
   text firmware_commit_hash
   text notes
+  boolean powers_on
 }
 "public.pdn_inspection_checks" {
   uuid inspection_id FK
