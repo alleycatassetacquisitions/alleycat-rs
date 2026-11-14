@@ -42,7 +42,8 @@ CREATE TYPE public.quickdraw_scoring_status AS ENUM (
     'same_team',
     'scoring_disabled',
     'unassigned_team',
-    'delayed_scores_disabled'
+    'delayed_scores_disabled',
+    'tie'
 );
 
 
@@ -415,7 +416,7 @@ CREATE TABLE public.quickdraw_matches (
     player_b_team_id uuid,
     player_a_draw_time_ms bigint NOT NULL,
     player_b_draw_time_ms bigint NOT NULL,
-    winner_player_id uuid NOT NULL,
+    winner_player_id uuid,
     occurred_at timestamp with time zone NOT NULL,
     received_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     scoring_status public.quickdraw_scoring_status NOT NULL,
@@ -424,21 +425,14 @@ CREATE TABLE public.quickdraw_matches (
     CONSTRAINT quickdraw_matches_player_a_draw_time_ms_check CHECK ((player_a_draw_time_ms >= 0)),
     CONSTRAINT quickdraw_matches_player_b_draw_time_ms_check CHECK ((player_b_draw_time_ms >= 0)),
     CONSTRAINT quickdraw_matches_received_at_check CHECK (isfinite(received_at)),
-    CONSTRAINT quickdraw_matches_scoring_teams_check CHECK ((((scoring_status)::text = ANY (ARRAY['scoring_disabled'::text, 'delayed_scores_disabled'::text])) OR (scoring_status =
+    CONSTRAINT quickdraw_matches_scoring_teams_check CHECK ((((winner_player_id IS NULL) AND ((scoring_status)::text = 'tie'::text)) OR ((winner_player_id IS NOT NULL) AND (((scoring_status)::text = ANY (ARRAY['scoring_disabled'::text, 'delayed_scores_disabled'::text])) OR (scoring_status =
 CASE
     WHEN ((player_a_team_id IS NULL) OR (player_b_team_id IS NULL)) THEN 'unassigned_team'::public.quickdraw_scoring_status
     WHEN (player_a_team_id = player_b_team_id) THEN 'same_team'::public.quickdraw_scoring_status
     ELSE 'scoring'::public.quickdraw_scoring_status
-END))),
+END))))),
     CONSTRAINT quickdraw_matches_winner_is_participant CHECK (((winner_player_id = player_a_id) OR (winner_player_id = player_b_id)))
 );
-
-
---
--- Name: TABLE quickdraw_matches; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.quickdraw_matches IS 'Completed two-player quickdraw results, including non-scoring duels. Ingestion must use INSERT ... ON CONFLICT (id) DO NOTHING: the first accepted report and its device timestamp win. No per-device reports or leaderboard totals are stored.';
 
 
 --
@@ -477,13 +471,6 @@ COMMENT ON COLUMN public.quickdraw_matches.player_b_draw_time_ms IS 'Device-meas
 
 
 --
--- Name: COLUMN quickdraw_matches.winner_player_id; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.quickdraw_matches.winner_player_id IS 'Explicit device-reported winner; must be one of the two participants. No inferred winner from draw times.';
-
-
---
 -- Name: COLUMN quickdraw_matches.occurred_at; Type: COMMENT; Schema: public; Owner: -
 --
 
@@ -498,10 +485,32 @@ COMMENT ON COLUMN public.quickdraw_matches.received_at IS 'Defaults to the datab
 
 
 --
--- Name: COLUMN quickdraw_matches.scoring_status; Type: COMMENT; Schema: public; Owner: -
+-- Name: quickdraw_matches_raw; Type: TABLE; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.quickdraw_matches.scoring_status IS 'First accepted scoring decision: outside a scoring period -> scoring_disabled; closed period with delayed scores disabled -> delayed_scores_disabled; either team missing -> unassigned_team; equal teams -> same_team; otherwise scoring. Ingestion checks period history and the event switch under the event row lock. The database checks team consistency; duplicates never rescore.';
+CREATE TABLE public.quickdraw_matches_raw (
+    id uuid NOT NULL,
+    event_id uuid NOT NULL,
+    match_id uuid,
+    mac_address text,
+    received_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    submitted_match_id text NOT NULL,
+    player_a_id text NOT NULL,
+    player_b_id text NOT NULL,
+    player_a_team_id text,
+    player_b_team_id text,
+    player_a_draw_time_ms numeric(20,0),
+    player_b_draw_time_ms numeric(20,0),
+    winner_player_id text,
+    occurred_at_unix_ms bigint,
+    failure_reason text,
+    submitted_mac_address text,
+    outcome text,
+    comparison_key text,
+    CONSTRAINT quickdraw_matches_raw_outcome_check CHECK ((outcome = ANY (ARRAY['completed'::text, 'tie'::text, 'failed'::text]))),
+    CONSTRAINT quickdraw_matches_raw_player_a_draw_time_ms_check CHECK (((player_a_draw_time_ms >= (0)::numeric) AND (player_a_draw_time_ms <= '18446744073709551615'::numeric))),
+    CONSTRAINT quickdraw_matches_raw_player_b_draw_time_ms_check CHECK (((player_b_draw_time_ms >= (0)::numeric) AND (player_b_draw_time_ms <= '18446744073709551615'::numeric)))
+);
 
 
 --
@@ -728,6 +737,14 @@ ALTER TABLE ONLY public.quickdraw_matches
 
 
 --
+-- Name: quickdraw_matches_raw quickdraw_matches_raw_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quickdraw_matches_raw
+    ADD CONSTRAINT quickdraw_matches_raw_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: reserved_pdn_codes reserved_pdn_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -806,6 +823,20 @@ CREATE INDEX quickdraw_matches_player_a_history_idx ON public.quickdraw_matches 
 --
 
 CREATE INDEX quickdraw_matches_player_b_history_idx ON public.quickdraw_matches USING btree (event_id, player_b_id, occurred_at, id);
+
+
+--
+-- Name: quickdraw_matches_raw_event_match_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX quickdraw_matches_raw_event_match_idx ON public.quickdraw_matches_raw USING btree (event_id, match_id);
+
+
+--
+-- Name: quickdraw_matches_raw_event_received_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX quickdraw_matches_raw_event_received_idx ON public.quickdraw_matches_raw USING btree (event_id, received_at DESC, id DESC);
 
 
 --
@@ -910,6 +941,14 @@ ALTER TABLE ONLY public.quickdraw_matches
 
 ALTER TABLE ONLY public.quickdraw_matches
     ADD CONSTRAINT quickdraw_matches_player_b_fkey FOREIGN KEY (event_id, player_b_id) REFERENCES public.players(event_id, id);
+
+
+--
+-- Name: quickdraw_matches_raw quickdraw_matches_raw_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.quickdraw_matches_raw
+    ADD CONSTRAINT quickdraw_matches_raw_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id);
 
 
 --

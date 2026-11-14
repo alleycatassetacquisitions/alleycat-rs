@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE quickdraw_matches_raw SET outcome = $1, comparison_key = $2 WHERE id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d9927e30ecc9b8b8a59920671aba10e05da31e322e17e1832e7a9081576537fd"
+}

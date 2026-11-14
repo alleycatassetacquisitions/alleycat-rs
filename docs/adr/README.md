@@ -40,7 +40,7 @@ context and rationale; typo fixes, clarifications, and repaired links are fine.
 
 | ADR | Status | Date |
 | --- | --- | --- |
-| [0001: Quickdraw results and scoring periods](0001-quickdraw-results-and-scoring-periods.md) | Partially superseded by 0003 | 2026-10-11 |
+| [0001: Quickdraw results and scoring periods](0001-quickdraw-results-and-scoring-periods.md) | Partially superseded by 0003 and 0015 | 2026-10-11 |
 | [0002: Quickdraw device ingestion](0002-quickdraw-device-ingestion.md) | Partially superseded by 0009 and 0010 | 2026-10-11 |
 | [0003: Reversible delayed scoring](0003-reversible-delayed-scoring.md) | Accepted | 2026-10-15 |
 | [0004: Player lifecycle and device lookups](0004-player-lifecycle-and-device-lookups.md) | Partially superseded by 0009 and 0012 | 2026-10-15 |
@@ -54,3 +54,4 @@ context and rationale; typo fixes, clarifications, and repaired links are fine.
 | [0012: Keep current PDN constraints at the device response boundary](0012-current-pdn-constraints.md) | Accepted | 2026-10-20 |
 | [0013: Keep physical devices and their inspection history across events](0013-device-inventory-and-inspections.md) | Accepted | 2026-10-28 |
 | [0014: Give each device kind its own inspection schema](0014-device-specific-inspection-schemas.md) | Accepted | 2026-10-28 |
+| [0015: Retain raw match reports and completed ties](0015-raw-match-reports-and-ties.md) | Accepted | 2026-11-13 |

@@ -59,7 +59,9 @@ impl Game {
             player_a_draw_time_ms: Some(0),
             player_b_draw_time_ms: Some(310),
             // Explicit winner is authoritative, even if their time is slower.
-            winner_player_id: self.players[1].to_string(),
+            winner_player_id: Some(self.players[1].to_string()),
+            failure_reason: None,
+            mac_address: None,
             occurred_at_unix_ms: Some(timestamp),
         }
     }
@@ -211,7 +213,7 @@ async fn retries_preserve_the_first_report_including_receipt_time() {
     let mut second = first.clone();
     second.player_a_draw_time_ms = Some(50);
     second.occurred_at_unix_ms = Some(1_790_000_000_100);
-    second.winner_player_id = game.players[0].to_string();
+    second.winner_player_id = Some(game.players[0].to_string());
     second.player_b_team_id = None;
     assert_eq!(
         upload(&app, vec![first.clone(), second.clone()])
@@ -385,7 +387,7 @@ async fn invalid_event_references_are_isolated_and_retries_preserve_accepted_mat
             0 => invalid.player_a_id = other.players[0].to_string(),
             1 => {
                 invalid.player_b_id = other.players[1].to_string();
-                invalid.winner_player_id = invalid.player_b_id.clone();
+                invalid.winner_player_id = Some(invalid.player_b_id.clone());
             }
             2 => invalid.player_a_team_id = Some(other.teams[0].to_string()),
             _ => invalid.player_b_team_id = Some(Uuid::new_v4().to_string()),
@@ -480,7 +482,7 @@ async fn invalid_fields_report_each_entry_and_request_errors_remain_atomic() {
             1 => report.player_a_id = "invalid".into(),
             2 => report.player_b_id.clear(),
             3 => report.player_b_id = report.player_a_id.clone(),
-            4 => report.winner_player_id = Uuid::new_v4().to_string(),
+            4 => report.winner_player_id = Some(Uuid::new_v4().to_string()),
             5 => report.player_a_team_id = Some(String::new()),
             6 => report.player_b_team_id = Some("invalid".into()),
             7 => report.player_a_draw_time_ms = None,
@@ -490,7 +492,7 @@ async fn invalid_fields_report_each_entry_and_request_errors_remain_atomic() {
             11 => report.occurred_at_unix_ms = None,
             12 => report.occurred_at_unix_ms = Some(-1),
             13 => report.occurred_at_unix_ms = Some(i64::MAX),
-            _ => report.winner_player_id.clear(),
+            _ => report.winner_player_id = Some("invalid".into()),
         }
         reports.push(report);
     }
@@ -791,5 +793,429 @@ async fn unexpected_database_failure_rolls_back_otherwise_accepted_entries() {
     )
     .await;
     assert!(!body.contains("private_failure"));
+    assert_eq!(raw_reports(&app, "").await["reports"], json!([]));
     assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
+}
+
+async fn raw_reports(app: &TestApp, suffix: &str) -> Value {
+    assert_json(
+        app.get(&format!("/quickdraw-matches/reports{suffix}"))
+            .await,
+        200,
+    )
+    .await
+}
+
+#[tokio::test]
+async fn ties_and_failures_preserve_raw_data_without_scoring_or_reserving_failed_ids() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    game.period(&app, 0, None).await;
+    let mut tie = game.report(1, 1000);
+    tie.winner_player_id = None;
+    let mut empty_tie = game.report(2, 1000);
+    empty_tie.winner_player_id = Some(String::new());
+    // Failure reports can be incomplete and retain even unvalidated gameplay fields.
+    let failure = QuickdrawMatch {
+        id: Uuid::from_u128(3).to_string(),
+        failure_reason: Some("No result received".into()),
+        player_a_id: "invalid-player".into(),
+        mac_address: Some("AA:BB:CC:DD:EE:01".into()),
+        ..Default::default()
+    };
+    assert_eq!(
+        upload(
+            &app,
+            vec![tie.clone(), empty_tie, failure.clone(), failure.clone()]
+        )
+        .await
+        .status(),
+        204
+    );
+    let body = list(&app).await;
+    assert_eq!(body["matches"].as_array().unwrap().len(), 2);
+    for row in body["matches"].as_array().unwrap() {
+        assert!(row["winner_player_id"].is_null());
+        assert_eq!(row["scoring_status"], "tie");
+    }
+    let scores: Value = assert_json(app.get("/score/players").await, 200).await;
+    for player in scores["players"].as_array().unwrap() {
+        assert_eq!(player["score"], 0);
+        assert_eq!(player["matches_played"], 0);
+        assert!(player["average_draw_time_ms"].is_null());
+    }
+    let raw = raw_reports(&app, "").await;
+    assert_eq!(raw["reports"].as_array().unwrap().len(), 4);
+    let stored_failure = raw["reports"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["outcome"] == "failed")
+        .unwrap();
+    assert_eq!(stored_failure["report"]["player_a_id"], "invalid-player");
+    assert_eq!(stored_failure["report"]["mac_address"], "AA:BB:CC:DD:EE:01");
+    assert_eq!(stored_failure["mac_address"], "AA:BB:CC:DD:EE:01");
+    assert_ne!(raw["reports"][0]["id"], raw["reports"][1]["id"]);
+    // A failure does not reserve the deduplicated result, but a tie does.
+    assert_eq!(
+        upload(&app, vec![game.report(3, 1000), game.report(1, 2000)])
+            .await
+            .status(),
+        204
+    );
+    let body = list(&app).await;
+    assert_eq!(body["matches"].as_array().unwrap().len(), 3);
+    let saved_tie = body["matches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == tie.id)
+        .unwrap();
+    assert!(saved_tie["winner_player_id"].is_null());
+    // The database independently prevents ties from scoring and wins from being classified as ties.
+    for sql in [
+        "UPDATE quickdraw_matches SET scoring_status = 'scoring' WHERE winner_player_id IS NULL",
+        "UPDATE quickdraw_matches SET scoring_status = 'tie' WHERE winner_player_id IS NOT NULL",
+    ] {
+        assert!(sqlx::query(sql).execute(&app.db_pool).await.is_err());
+    }
+}
+
+#[tokio::test]
+async fn reporter_groups_count_distinct_submitted_macs_and_are_event_scoped() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let first = game.report(1, 1000);
+    assert_eq!(
+        upload(&app, vec![first.clone(), first.clone()])
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(
+        raw_reports(&app, "/unassigned").await["matches"][0]["reporting_device_count"],
+        0
+    );
+    let mut known = first.clone();
+    known.mac_address = Some("AA:BB:CC:DD:EE:01".into());
+    let retry = known.clone();
+    assert_eq!(upload(&app, vec![known, retry]).await.status(), 204);
+    let orphans = raw_reports(&app, "/orphaned").await;
+    assert_eq!(orphans["matches"][0]["report_count"], 4);
+    assert_eq!(orphans["matches"][0]["reporting_device_count"], 1);
+    assert_eq!(raw_reports(&app, "/unassigned").await["matches"], json!([]));
+    let mut other = first;
+    other.mac_address = Some("aa:bb:cc:dd:ee:01".into());
+    assert_eq!(
+        upload(&app, vec![other, game.report(2, 1000)])
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(raw_reports(&app, "/orphaned").await["matches"], json!([]));
+    let filter = format!("?match_id={}&per_page=2", Uuid::from_u128(1));
+    let page = raw_reports(&app, &filter).await;
+    assert_eq!(page["reports"].as_array().unwrap().len(), 2);
+    assert_eq!(page["pagination"], json!({"page":1,"per_page":2}));
+    assert!(
+        page["reports"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|r| r["match_id"] == Uuid::from_u128(1).to_string())
+    );
+    let next = raw_reports(&app, &format!("{filter}&page=2")).await;
+    assert_ne!(page["reports"][0]["id"], next["reports"][0]["id"]);
+    let second_game = Game::create(&app).await;
+    for suffix in ["", "/orphaned", "/unassigned", "/disagreements"] {
+        let body = raw_reports(&app, suffix).await;
+        assert_eq!(
+            body[if suffix.is_empty() {
+                "reports"
+            } else {
+                "matches"
+            }],
+            json!([])
+        );
+    }
+    assert_ne!(game.event, second_game.event);
+}
+
+#[tokio::test]
+async fn disagreement_detection_compares_only_shared_outcomes_and_player_measurements() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let first = game.report(1, 1000);
+    let mut reordered = first.clone();
+    std::mem::swap(&mut reordered.player_a_id, &mut reordered.player_b_id);
+    std::mem::swap(
+        &mut reordered.player_a_draw_time_ms,
+        &mut reordered.player_b_draw_time_ms,
+    );
+    reordered.player_a_id = reordered.player_a_id.to_uppercase();
+    reordered.winner_player_id = reordered.winner_player_id.map(|v| v.to_uppercase());
+    reordered.player_a_team_id = None;
+    reordered.player_b_team_id = None;
+    reordered.occurred_at_unix_ms = Some(9000);
+    reordered.mac_address = Some("aa:bb:cc:dd:ee:01".into());
+    let mut failed = QuickdrawMatch {
+        id: Uuid::from_u128(2).to_string(),
+        failure_reason: Some("timeout".into()),
+        ..Default::default()
+    };
+    let failed_first = failed.clone();
+    failed.failure_reason = Some("radio failure".into());
+    assert_eq!(
+        upload(&app, vec![first, reordered, failed_first, failed])
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(
+        raw_reports(&app, "/disagreements").await["matches"],
+        json!([])
+    );
+    let mut different_time = game.report(1, 1000);
+    different_time.player_a_draw_time_ms = Some(1);
+    let mut tie = game.report(2, 1000);
+    tie.winner_player_id = None;
+    let mut other_winner = game.report(3, 1000);
+    other_winner.winner_player_id = Some(game.players[0].to_string());
+    assert_eq!(
+        upload(
+            &app,
+            vec![different_time, tie, game.report(3, 1000), other_winner]
+        )
+        .await
+        .status(),
+        204
+    );
+    let groups = raw_reports(&app, "/disagreements").await;
+    assert_eq!(groups["matches"].as_array().unwrap().len(), 3);
+    let page = raw_reports(&app, "/disagreements?per_page=1&page=2").await;
+    assert_eq!(page["matches"].as_array().unwrap().len(), 1);
+    assert_eq!(page["matches"][0], groups["matches"][1]);
+}
+
+#[tokio::test]
+async fn rejected_reports_are_retained_without_becoming_disagreements() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let mut arbitrary_mac = game.report(1, 1000);
+    arbitrary_mac.mac_address = Some("not-a-mac".into());
+    let mut bad_reason = game.report(1, 1000);
+    bad_reason.failure_reason = Some(String::new());
+    let mut bad_id = game.report(1, 1000);
+    bad_id.id = "bad-id".into();
+    let mut bad_player = game.report(3, 1000);
+    bad_player.player_a_id = Uuid::new_v4().to_string();
+    let errors = rejections(
+        upload(
+            &app,
+            vec![
+                game.report(2, 1000),
+                arbitrary_mac,
+                bad_reason,
+                bad_id,
+                bad_player,
+            ],
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(errors.len(), 2);
+    assert_eq!(errors[0].code(), QuickdrawMatchErrorCode::InvalidUuid);
+    let raw = raw_reports(&app, "").await;
+    assert_eq!(raw["reports"].as_array().unwrap().len(), 5);
+    assert_eq!(
+        raw["reports"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r["outcome"].is_null())
+            .count(),
+        2
+    );
+    assert_eq!(
+        raw_reports(&app, "/disagreements").await["matches"],
+        json!([])
+    );
+    // A cross-event conflict retains the whole raw batch but no new completed result.
+    let other = Game::create(&app).await;
+    assert_eq!(
+        upload(&app, vec![other.report(2, 1000), other.report(3, 1000)])
+            .await
+            .status(),
+        409
+    );
+    assert_eq!(
+        raw_reports(&app, "").await["reports"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(list(&app).await["matches"], json!([]));
+}
+
+#[tokio::test]
+async fn report_endpoints_require_an_active_event_and_validate_queries() {
+    let app = spawn_app().await;
+    for suffix in ["", "/orphaned", "/unassigned", "/disagreements"] {
+        assert_eq!(
+            app.get(&format!("/quickdraw-matches/reports{suffix}"))
+                .await
+                .status(),
+            409
+        );
+    }
+    let game = Game::create(&app).await;
+    assert_eq!(upload(&app, vec![game.report(1, 1000)]).await.status(), 204);
+    for query in ["?match_id=invalid", "?page=-1"] {
+        assert_eq!(
+            app.get(&format!("/quickdraw-matches/reports{query}"))
+                .await
+                .status(),
+            400
+        );
+    }
+}
+
+#[tokio::test]
+async fn raw_match_fields_are_queryable_and_round_trip_without_a_payload() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let mut report = game.report(1, 1000);
+    report.id = report.id.to_uppercase();
+    report.player_a_id = report.player_a_id.to_uppercase();
+    report.mac_address = Some("AA:BB:CC:DD:EE:FF".into());
+    report.player_a_draw_time_ms = Some(125);
+    let mut failed = report.clone();
+    failed.id = Uuid::from_u128(2).to_string();
+    failed.failure_reason = Some("Communication lost".into());
+    failed.player_a_draw_time_ms = Some(u64::MAX);
+    failed.player_b_draw_time_ms = None;
+    failed.player_a_team_id = Some(String::new());
+    failed.player_b_team_id = None;
+    failed.winner_player_id = Some(String::new());
+    failed.occurred_at_unix_ms = Some(i64::MIN);
+    let mut rejected = game.report(3, 1000);
+    rejected.player_b_draw_time_ms = Some(u64::MAX);
+    rejected.mac_address = Some("bad-mac".into());
+    let submitted = vec![report.clone(), failed, rejected];
+    let errors = rejections(upload(&app, submitted.clone()).await).await;
+    assert_eq!(errors.len(), 1);
+    let raw = raw_reports(&app, "").await;
+    for original in submitted {
+        let saved = raw["reports"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["report"]["id"] == original.id)
+            .unwrap();
+        assert_eq!(saved["report"], serde_json::to_value(original).unwrap());
+    }
+    let (player, team, time, winner, timestamp, mac): (
+        String,
+        Option<String>,
+        String,
+        Option<String>,
+        Option<i64>,
+        Option<String>,
+    ) = sqlx::query_as(
+        "SELECT player_a_id, player_a_team_id, player_a_draw_time_ms::text,
+                winner_player_id, occurred_at_unix_ms, submitted_mac_address
+         FROM quickdraw_matches_raw WHERE submitted_match_id = $1",
+    )
+    .bind(&report.id)
+    .fetch_one(&app.db_pool)
+    .await
+    .unwrap();
+    assert_eq!(player, report.player_a_id);
+    assert_eq!(team, report.player_a_team_id);
+    assert_eq!(time, "125");
+    assert_eq!(winner, report.winner_player_id);
+    assert_eq!(timestamp, report.occurred_at_unix_ms);
+    assert_eq!(mac, report.mac_address);
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM quickdraw_matches_raw
+         WHERE player_a_draw_time_ms > 9223372036854775807 AND failure_reason = 'Communication lost'")
+        .fetch_one(&app.db_pool).await.unwrap();
+    assert_eq!(count, 1);
+    let average: String = sqlx::query_scalar(
+        "SELECT AVG(player_a_draw_time_ms)::text FROM quickdraw_matches_raw WHERE outcome = 'completed'")
+        .fetch_one(&app.db_pool).await.unwrap();
+    assert_eq!(average.parse::<f64>().unwrap(), 125.0);
+    let payload_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'quickdraw_matches_raw' AND column_name = 'payload')")
+        .fetch_one(&app.db_pool).await.unwrap();
+    assert!(!payload_exists);
+}
+
+#[tokio::test]
+async fn postgres_nul_rejection_returns_400_and_rolls_back_the_batch() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    for optional in [false, true] {
+        let mut invalid = game.report(2, 1000);
+        if optional {
+            invalid.failure_reason = Some("bad\0reason".into());
+        } else {
+            invalid.player_a_id = "bad\0player".into();
+        }
+        let body =
+            assert_text_error(upload(&app, vec![game.report(1, 1000), invalid]).await, 400).await;
+        assert!(body.contains("NUL"));
+        assert_eq!(raw_reports(&app, "").await["reports"], json!([]));
+        assert_eq!(list(&app).await["matches"], json!([]));
+    }
+}
+
+#[tokio::test]
+async fn failure_reason_only_needs_a_value_and_macs_are_not_format_validated() {
+    let app = spawn_app().await;
+    let game = Game::create(&app).await;
+    let mut reports = Vec::new();
+    for (index, reason) in [
+        None,
+        Some(String::new()),
+        Some(" \t ".into()),
+        Some("x".repeat(2048)),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut report = game.report(index as u128 + 1, 1000);
+        report.failure_reason = reason;
+        report.mac_address = Some("device-a".into());
+        reports.push(report);
+    }
+    assert_eq!(upload(&app, reports).await.status(), 204);
+    assert_eq!(list(&app).await["matches"].as_array().unwrap().len(), 3);
+    let raw = raw_reports(&app, "").await;
+    let failed = raw["reports"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["outcome"] == "failed")
+        .unwrap();
+    assert_eq!(
+        failed["report"]["failure_reason"].as_str().unwrap().len(),
+        2048
+    );
+    assert_eq!(
+        raw_reports(&app, "/orphaned").await["matches"]
+            .as_array()
+            .unwrap()
+            .len(),
+        4
+    );
+    let mut unknown_device = game.report(5, 1000);
+    unknown_device.mac_address = Some("  ".into());
+    assert_eq!(upload(&app, vec![unknown_device]).await.status(), 204);
+    assert_eq!(
+        raw_reports(&app, "/unassigned").await["matches"][0]["match_id"],
+        Uuid::from_u128(5).to_string()
+    );
 }

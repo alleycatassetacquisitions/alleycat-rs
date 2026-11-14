@@ -9,6 +9,7 @@ DROP TABLE IF EXISTS
     player_affiliations,
     affiliations,
     affiliation_categories,
+    quickdraw_matches_raw,
     quickdraw_matches,
     event_scoring_periods,
     device_logs,

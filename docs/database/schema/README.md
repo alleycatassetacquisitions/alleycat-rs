@@ -20,13 +20,14 @@ do not edit these files manually.
 | [public.app_state](public.app_state.md) | 2 |  | BASE TABLE |
 | [public.teams](public.teams.md) | 3 |  | BASE TABLE |
 | [public.event_scoring_periods](public.event_scoring_periods.md) | 4 | Event scoring history. Opening creates a row; closing fills closes_at. Match eligibility uses device occurrence time, not upload time. No unclosed period means scoring is disabled. | BASE TABLE |
-| [public.quickdraw_matches](public.quickdraw_matches.md) | 12 | Completed two-player quickdraw results, including non-scoring duels. Ingestion must use INSERT ... ON CONFLICT (id) DO NOTHING: the first accepted report and its device timestamp win. No per-device reports or leaderboard totals are stored. | BASE TABLE |
+| [public.quickdraw_matches](public.quickdraw_matches.md) | 12 |  | BASE TABLE |
 | [public.affiliation_categories](public.affiliation_categories.md) | 4 | Operator-defined affiliation categories within an event. No seeded categories or implied gameplay behavior. | BASE TABLE |
 | [public.affiliations](public.affiliations.md) | 4 | Operator-defined affiliations within a category. Names have no implicit gameplay or permission behavior. | BASE TABLE |
 | [public.player_affiliations](public.player_affiliations.md) | 4 | At most one affiliation per player per category. Composite foreign keys keep player, category, and affiliation in the same event. Clearing an assignment deletes its row; changes do not affect scores. | BASE TABLE |
 | [public.devices](public.devices.md) | 6 | Physical device inventory shared across events. IDs and printed labels identify devices independently of inspection history. Currently supports PDNs. | BASE TABLE |
 | [public.device_inspections](public.device_inspections.md) | 8 | Saved condition checks. Each row is a complete snapshot; missing checks are unknown, never inherited from earlier inspections. API writes never replace an accepted inspection. | BASE TABLE |
 | [public.pdn_inspection_checks](public.pdn_inspection_checks.md) | 11 | PDN component observations for one inspection. Shared identity, timestamps, firmware, and notes live in device_inspections. Other device classes can define their own checks. | BASE TABLE |
+| [public.quickdraw_matches_raw](public.quickdraw_matches_raw.md) | 18 |  | BASE TABLE |
 
 ## Stored procedures and functions
 
@@ -42,7 +43,7 @@ do not edit these files manually.
 
 | Name | Values |
 | ---- | ------- |
-| public.quickdraw_scoring_status | delayed_scores_disabled, same_team, scoring, scoring_disabled, unassigned_team |
+| public.quickdraw_scoring_status | delayed_scores_disabled, same_team, scoring, scoring_disabled, tie, unassigned_team |
 
 ## Relations
 
@@ -65,6 +66,7 @@ erDiagram
 "public.player_affiliations" }o--|| "public.affiliations" : "FOREIGN KEY (event_id, category_id, affiliation_id) REFERENCES affiliations(event_id, category_id, id)"
 "public.device_inspections" }o--|| "public.devices" : "FOREIGN KEY (device_id, device_kind) REFERENCES devices(id, device_kind)"
 "public.pdn_inspection_checks" }o--|| "public.device_inspections" : "FOREIGN KEY (inspection_id, device_kind) REFERENCES device_inspections(id, device_kind)"
+"public.quickdraw_matches_raw" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 
 "public.players" {
   uuid id
@@ -177,6 +179,26 @@ erDiagram
   boolean input_jack
   boolean output_jack
   boolean housing
+}
+"public.quickdraw_matches_raw" {
+  uuid id
+  uuid event_id FK
+  uuid match_id
+  text mac_address
+  timestamp_with_time_zone received_at
+  text submitted_match_id
+  text player_a_id
+  text player_b_id
+  text player_a_team_id
+  text player_b_team_id
+  numeric_20_0_ player_a_draw_time_ms
+  numeric_20_0_ player_b_draw_time_ms
+  text winner_player_id
+  bigint occurred_at_unix_ms
+  text failure_reason
+  text submitted_mac_address
+  text outcome
+  text comparison_key
 }
 ```
 
