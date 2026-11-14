@@ -29,7 +29,7 @@
 
 ## API documentation
 
-- Follow [ADR 0007](docs/adr/0007-active-event-api-scope.md) when choosing event
+- Follow [Event API scope](docs/adr/event-api-scope.md) when choosing event
   scope for routes.
 - Update OpenAPI annotations alongside API changes.
 - Keep HTTP endpoint contracts in OpenAPI annotations and device message contracts
@@ -46,11 +46,19 @@
 
 ## Architecture decisions
 
-- Record significant architecture decisions and their tradeoffs in `docs/adr/`.
-  Follow its README and template; routine implementation changes do not need an ADR.
-- Read relevant accepted ADRs before changing the behavior they describe.
-- When a decision changes, add a superseding ADR and link both records rather
-  than rewriting the original rationale. Keep the ADR index current.
+- Keep one current decision document per topic in `docs/adr/`, using a stable,
+  descriptive filename without a number. Follow its README and template.
+- Read the topic index and relevant accepted decisions before changing behavior.
+- ADRs explain decisions whose reasons are not evident in the code. Keep them
+  concise and human-readable; a sentence or two is enough when it explains the
+  decision and its reason. Routine implementation changes do not need a record.
+- Update the owning document when an agreed decision changes. Git preserves
+  history; do not create superseding records, revision files, or amendment logs.
+  State each decision once and keep the topic index current.
+- Flag conflicts with accepted decisions and explain the proposed change. An
+  explicit user instruction changing a decision authorizes updating it; otherwise
+  resolve the conflict before changing the decision. Do not invent missing rationale
+  or treat incidental implementation details as permanent requirements.
 - Keep API contracts in OpenAPI and schema details in generated database docs;
   link to them from ADRs instead of duplicating reference documentation.
 

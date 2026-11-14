@@ -1,57 +1,79 @@
 # Architecture decision records
 
-ADRs capture why we chose an architecture, the alternatives considered, and the
-tradeoffs we accepted. They help future changes preserve the intent behind the
-code. An accepted decision can be implemented in stages; its status does not
-mean every related feature has shipped.
+ADRs explain decisions whose reasons are not evident in the code. They help
+people and agents understand those reasons without the original conversation.
+Each topic has one current document; Git keeps its history.
+Our ADRs are maintained in place, without supersession chains or amendment logs.
 
-## When to write one
+## What to record
 
-Write an ADR for a significant choice about data ownership, persistence,
-consistency, system boundaries, or behavior that would be costly or surprising
-to change. Bug fixes, routine refactors, and small implementation details usually
-do not need one. Keep each record focused on one decision or a closely related
-set of decisions. Keep it to a few short paragraphs covering the decision and
-its meaningful tradeoffs. Omit implementation walkthroughs and repeated contract
-details.
+Record significant choices about product behavior, ownership, persistence,
+consistency, or system boundaries that would be costly or surprising to change.
+Explain what a reader cannot reliably learn from code: why this approach fits,
+which real alternatives were rejected, and what costs we accept. Routine fixes,
+refactors, and implementation details usually do not need a record.
 
-Use OpenAPI for current API contracts, the
-[generated database reference](../database/schema/README.md) for schema details, and the
-[project README](../../readme.md) for operating instructions. Link to those sources
-and the implementation where useful.
+Keep documents concise and human-readable. A sentence or two is enough when it
+explains the decision and its reason. Explain each decision alongside its reason.
+Use only the template sections that help; combine or omit sections as appropriate.
+Split independently useful topics when a document grows; do not split a topic
+just because its decision changed. State each decision once in its owning document
+and link to it elsewhere. Preserve useful reasons for rejected alternatives, not
+the transcript of the discussion. Flag unknown rationale rather than invent it.
 
-## Creating and maintaining a record
+Keep HTTP contracts in OpenAPI, device contracts in
+[protobuf comments](../../proto/device_api.proto), schema details in the
+[database reference](../database/schema/README.md), and operating instructions in
+the [project README](../../readme.md). Link to them rather than duplicate fields,
+validation rules, endpoint inventories, or implementation walkthroughs.
 
-1. Copy [template.md](template.md) to `NNNN-short-decision-title.md`, using the
-   next unused four-digit number. Never reuse or renumber an existing record.
-2. Set the date to the decision date in `YYYY-MM-DD` format. Use `Proposed` while
-   evaluating a choice and `Accepted` once agreed. Decisions already agreed
-   during the work can be recorded directly as accepted.
-3. Describe the problem, chosen approach, real alternatives, and consequences.
-   Note important deferred work without turning the record into a task list.
-4. Add the record to the index below and include it with the relevant change.
+## Creating and maintaining documents
 
-Use `Rejected` for a proposal that was considered but not adopted. If an accepted
-decision is replaced, create a new record, mark the old one `Superseded`, and link
-both records using their status lines. Update this index too. Preserve the old
-context and rationale; typo fixes, clarifications, and repaired links are fine.
+1. Read the topic index and relevant documents before changing behavior. Update
+   the existing owner when the topic is already covered.
+2. For a new topic, copy [template.md](template.md) to a descriptive filename such
+   as `quickdraw-ingestion.md`. Use stable topic names without numbers, dates,
+   version suffixes, or titles describing a one-time change.
+3. Use `Proposed` for a choice awaiting agreement and `Accepted` once agreed.
+   Proposed text is non-binding. Acceptance does not mean implementation is
+   complete; briefly identify any implementation gap. Do not replace an accepted
+   decision with an unagreed proposal; discuss the proposal in the change review.
+4. Update the decision, why, and tradeoffs together in the same change as the
+   implementation. Remove obsolete statements and completed follow-ups. Git is
+   the changelog; do not add revision files, superseding records, or amendment logs.
+5. Keep the index and links current. When merging or retiring topics, preserve
+   still-relevant rationale in the remaining owner and remove obsolete files.
+   Historical versions and rejected proposals remain available in Git or review
+   discussion rather than competing with current guidance.
 
-## Index
+Accepted decisions guide work but can be questioned. When a task conflicts with
+one, flag the conflict and explain the proposed change instead of forcing an
+obsolete design to fit. An explicit user instruction changing the decision is
+authorization to update it; otherwise resolve the conflict before changing it.
+Do not silently rewrite a decision merely because the implementation differs.
 
-| ADR | Status | Date |
-| --- | --- | --- |
-| [0001: Quickdraw results and scoring periods](0001-quickdraw-results-and-scoring-periods.md) | Partially superseded by 0003 and 0015 | 2026-10-11 |
-| [0002: Quickdraw device ingestion](0002-quickdraw-device-ingestion.md) | Partially superseded by 0009 and 0010 | 2026-10-11 |
-| [0003: Reversible delayed scoring](0003-reversible-delayed-scoring.md) | Accepted | 2026-10-15 |
-| [0004: Player lifecycle and device lookups](0004-player-lifecycle-and-device-lookups.md) | Partially superseded by 0009 and 0012 | 2026-10-15 |
-| [0005: Extension-free scoring-period constraints](0005-extension-free-scoring-periods.md) | Accepted | 2026-10-16 |
-| [0006: Event affiliations](0006-event-affiliations.md) | Partially superseded by 0008 | 2026-10-17 |
-| [0007: Use the active event for routine API operations](0007-active-event-api-scope.md) | Partially superseded by 0009 | 2026-10-18 |
-| [0008: Include affiliations in device player lookups](0008-device-player-affiliations.md) | Partially superseded by 0012 | 2026-10-18 |
-| [0009: Accept match uploads only for the active event](0009-active-event-match-uploads.md) | Partially superseded by 0010 | 2026-10-18 |
-| [0010: Accept valid matches from partially invalid batches](0010-partial-match-batch-acceptance.md) | Accepted | 2026-10-18 |
-| [0011: Player scoreboard](0011-player-scoreboard.md) | Accepted | 2026-10-18 |
-| [0012: Keep current PDN constraints at the device response boundary](0012-current-pdn-constraints.md) | Accepted | 2026-10-20 |
-| [0013: Keep physical devices and their inspection history across events](0013-device-inventory-and-inspections.md) | Accepted | 2026-10-28 |
-| [0014: Give each device kind its own inspection schema](0014-device-specific-inspection-schemas.md) | Accepted | 2026-10-28 |
-| [0015: Retain raw match reports and completed ties](0015-raw-match-reports-and-ties.md) | Accepted | 2026-11-13 |
+Before finishing, check that a reader can find the topic by name and understand
+the current choice without following its history. Check links, conflicting rules,
+and whether still-relevant rationale was lost during consolidation.
+
+## Topic index
+
+| Topic | Question it answers |
+| --- | --- |
+| [Device inventory and inspections](device-inventory-and-inspections.md) | Why keep device identities and typed inspection snapshots across events? |
+| [Device player lookups](device-player-lookups.md) | Why give PDNs a separate, filtered response and convert display text at the boundary? |
+| [Event affiliations](event-affiliations.md) | Why let each event define optional membership categories independently of gameplay roles? |
+| [Event API scope](event-api-scope.md) | Which operations follow the active event, and why are there exceptions? |
+| [Player lifecycle](player-lifecycle.md) | Why retain inactive registrations and preserve their match history? |
+| [Player scoreboard](player-scoreboard.md) | Why calculate rankings from scoring matches and share ranks for equal scores? |
+| [Quickdraw ingestion](quickdraw-ingestion.md) | Why accept partial batches, trust match-time snapshots, and preserve the first completed result? |
+| [Quickdraw raw reports and diagnostics](quickdraw-raw-reports.md) | Why retain duplicate and rejected submissions without reconciling results? |
+| [Quickdraw scoring](quickdraw-scoring.md) | Why use scoring periods and let operators control late points without rewriting results? |
+| [Scoring-period database constraints](scoring-period-constraints.md) | Why enforce non-overlap with UUID ranges instead of a database extension? |
+
+## Foundations
+
+- [Coding Agents Love Decision Records](https://www.oreilly.com/radar/coding-agents-love-decision-records/): durable intent, readable current decisions, and history in Git.
+- [Diátaxis: Explanation](https://diataxis.fr/explanation/): bounded topics explaining reasons and alternatives separately from reference material.
+- [Software Engineering at Google: Documentation](https://abseil.io/resources/swe-book/html/ch10.html): canonical documents maintained alongside code.
+- [Design Docs at Google](https://www.industrialempathy.com/posts/design-docs-at-google/): tradeoffs and consistent documents rather than accumulated amendments.

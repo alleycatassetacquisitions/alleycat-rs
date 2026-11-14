@@ -1,31 +1,16 @@
-# NNNN: Decision title
+# Topic name
 
 - Status: Proposed
-- Date: YYYY-MM-DD
 
-<!-- When replacing a decision, add "Supersedes: [NNNN](...)" here. In the old
-record, change the status to "Superseded by [NNNN](...)". Remove these comments
-and replace the prompts below when writing a record. -->
+<!-- Explain the decision and its reason together. Be concise and human-readable;
+a sentence or two may be enough. Include only reasons that are not evident in the
+code, meaningful tradeoffs, and real alternatives. Do not invent rationale or add
+text to fill sections. If accepted but not fully implemented, identify the gap.
+Remove this comment and replace the prompt below when writing a record. -->
 
-## Context
-
-What problem are we solving? What constraints and requirements matter?
-
-## Decision
-
-What approach did we choose, and why? State the behavior future changes should
-preserve. Identify any important boundaries or deferred decisions.
-
-## Alternatives considered
-
-Which plausible alternatives did we consider, and why did we not choose them?
-
-## Consequences
-
-What becomes easier? What costs, limitations, or risks do we accept? What would
-prompt us to revisit this decision?
+We chose [approach] because [reason not evident in the code].
 
 ## References
 
-Link to relevant code, migrations, requirements, API or schema documentation,
-and related ADRs. Keep detailed reference material in its existing home.
+Link to authoritative contracts or relevant code and related topics where useful.
+Omit this section if no references are needed.
