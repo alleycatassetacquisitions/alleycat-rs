@@ -70,7 +70,8 @@
                 "same_team",
                 "scoring_disabled",
                 "unassigned_team",
-                "delayed_scores_disabled"
+                "delayed_scores_disabled",
+                "tie"
               ]
             }
           }
@@ -93,7 +94,7 @@
       true,
       false,
       false,
-      false,
+      true,
       false,
       false,
       false

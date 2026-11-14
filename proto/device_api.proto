@@ -85,16 +85,17 @@ message WriteDeviceLogRequest {
 }
 
 // POST /quickdraw-matches, application/protobuf.
-// Upload completed matches for the active event. 204 means all entries were
+// Upload match reports for the active event. 204 means all entries were
 // accepted; 200 returns WriteQuickdrawMatchesResponse with rejected entries.
 // See the HTTP API docs for request-wide errors and scoring behavior.
 message WriteQuickdrawMatchesRequest {
-  // Required batch of 1-100 completed matches. Maximum encoded request body: 256 KiB.
+  // Required batch of 1-100 match reports. Maximum encoded request body: 256 KiB.
   repeated QuickdrawMatch matches = 1;
 }
 
 // Response body for HTTP 200 from POST /quickdraw-matches, application/protobuf.
-// Retrying the same IDs is safe: the first accepted report is never overwritten.
+// Retrying the same IDs is safe: the first accepted completed result is never overwritten.
+// Every retry adds raw history, including failures that never create a completed result.
 message WriteQuickdrawMatchesResponse {
   // One rejection per failed entry, in request order; may include every entry.
   // Entries not listed were saved or already stored.
@@ -131,6 +132,10 @@ enum QuickdrawMatchErrorCode {
   QUICKDRAW_MATCH_ERROR_CODE_INVALID_EVENT_REFERENCE = 6;
 }
 
+// All string fields must be free of NUL characters; otherwise the whole upload
+// returns 400 and saves nothing.
+// Validation requirements below apply to completed reports. When failure_reason
+// contains non-whitespace text, only id is validated.
 message QuickdrawMatch {
   // Required UUID strings. Both devices must use the same shared match ID.
   string id = 1;
@@ -152,13 +157,24 @@ message QuickdrawMatch {
   // Must fit a signed 64-bit integer (maximum 9223372036854775807).
   optional uint64 player_b_draw_time_ms = 7;
 
-  // Required participant UUID. The server does not infer the winner from times.
-  string winner_player_id = 8;
+  // Participant UUID for a completed win. Absent or empty means a tie when
+  // failure_reason is absent or blank. The server never infers the outcome from times.
+  optional string winner_player_id = 8;
 
   // Required UTC milliseconds since 1970-01-01; nonnegative, through year 9999.
   // Maximum 253402300799999.
-  // The first accepted upload supplies the timestamp and all other fields.
+  // The first accepted completed upload supplies the timestamp and all other fields.
   optional int64 occurred_at_unix_ms = 9;
+
+  // Non-whitespace text means the match failed; saved only in raw reports and never scores.
+  // Absent, empty or whitespace-only means no failure. The request body limit applies.
+  // Failed reports require only a valid match ID;
+  // participant IDs, teams, draw times, winner, and occurrence time are not validated.
+  optional string failure_reason = 10;
+  // Sending device's MAC, stored as supplied without format validation.
+  // Optional; absent, empty or whitespace-only values do not count as a reporter.
+  // Reporter counts compare the submitted strings exactly, including letter case.
+  optional string mac_address = 11;
 }
 
 // Registers a device if needed and saves its inspection atomically.

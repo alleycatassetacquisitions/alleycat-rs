@@ -1,6 +1,6 @@
 # 0001: Quickdraw results and scoring periods
 
-- Status: Superseded by [0003](0003-reversible-delayed-scoring.md) for delayed-match eligibility; other decisions remain in effect.
+- Status: Superseded by [0003](0003-reversible-delayed-scoring.md) for delayed-match eligibility and [0015](0015-raw-match-reports-and-ties.md) for retaining per-device reports; other decisions remain in effect.
 - Date: 2026-10-11
 
 ## Context

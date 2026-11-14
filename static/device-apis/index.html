@@ -555,7 +555,7 @@ These are membership details, not permissions or match-time scoring snapshots. <
 
 
         <h3 id="alleycat.device.QuickdrawMatch">QuickdrawMatch</h3>
-        <p></p>
+        <p>All string fields must be free of NUL characters; otherwise the whole upload</p><p>returns 400 and saves nothing.</p><p>Validation requirements below apply to completed reports. When failure_reason</p><p>contains non-whitespace text, only id is validated.</p>
 
 
           <table class="field-table">
@@ -619,8 +619,9 @@ Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
                 <tr>
                   <td>winner_player_id</td>
                   <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>Required participant UUID. The server does not infer the winner from times. </p></td>
+                  <td>optional</td>
+                  <td><p>Participant UUID for a completed win. Absent or empty means a tie when
+failure_reason is absent or blank. The server never infers the outcome from times. </p></td>
                 </tr>
 
                 <tr>
@@ -629,7 +630,26 @@ Must fit a signed 64-bit integer (maximum 9223372036854775807). </p></td>
                   <td>optional</td>
                   <td><p>Required UTC milliseconds since 1970-01-01; nonnegative, through year 9999.
 Maximum 253402300799999.
-The first accepted upload supplies the timestamp and all other fields. </p></td>
+The first accepted completed upload supplies the timestamp and all other fields. </p></td>
+                </tr>
+
+                <tr>
+                  <td>failure_reason</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>Non-whitespace text means the match failed; saved only in raw reports and never scores.
+Absent, empty or whitespace-only means no failure. The request body limit applies.
+Failed reports require only a valid match ID;
+participant IDs, teams, draw times, winner, and occurrence time are not validated. </p></td>
+                </tr>
+
+                <tr>
+                  <td>mac_address</td>
+                  <td><a href="#string">string</a></td>
+                  <td>optional</td>
+                  <td><p>Sending device&#39;s MAC, stored as supplied without format validation.
+Optional; absent, empty or whitespace-only values do not count as a reporter.
+Reporter counts compare the submitted strings exactly, including letter case. </p></td>
                 </tr>
 
             </tbody>
@@ -793,7 +813,7 @@ presence of optional fields. Reports never update registration metadata. </p></t
 
 
         <h3 id="alleycat.device.WriteQuickdrawMatchesRequest">WriteQuickdrawMatchesRequest</h3>
-        <p>POST /quickdraw-matches, application/protobuf.</p><p>Upload completed matches for the active event. 204 means all entries were</p><p>accepted; 200 returns WriteQuickdrawMatchesResponse with rejected entries.</p><p>See the HTTP API docs for request-wide errors and scoring behavior.</p>
+        <p>POST /quickdraw-matches, application/protobuf.</p><p>Upload match reports for the active event. 204 means all entries were</p><p>accepted; 200 returns WriteQuickdrawMatchesResponse with rejected entries.</p><p>See the HTTP API docs for request-wide errors and scoring behavior.</p>
 
 
           <table class="field-table">
@@ -806,7 +826,7 @@ presence of optional fields. Reports never update registration metadata. </p></t
                   <td>matches</td>
                   <td><a href="#alleycat.device.QuickdrawMatch">QuickdrawMatch</a></td>
                   <td>repeated</td>
-                  <td><p>Required batch of 1-100 completed matches. Maximum encoded request body: 256 KiB. </p></td>
+                  <td><p>Required batch of 1-100 match reports. Maximum encoded request body: 256 KiB. </p></td>
                 </tr>
 
             </tbody>
@@ -817,7 +837,7 @@ presence of optional fields. Reports never update registration metadata. </p></t
 
 
         <h3 id="alleycat.device.WriteQuickdrawMatchesResponse">WriteQuickdrawMatchesResponse</h3>
-        <p>Response body for HTTP 200 from POST /quickdraw-matches, application/protobuf.</p><p>Retrying the same IDs is safe: the first accepted report is never overwritten.</p>
+        <p>Response body for HTTP 200 from POST /quickdraw-matches, application/protobuf.</p><p>Retrying the same IDs is safe: the first accepted completed result is never overwritten.</p><p>Every retry adds raw history, including failures that never create a completed result.</p>
 
 
           <table class="field-table">

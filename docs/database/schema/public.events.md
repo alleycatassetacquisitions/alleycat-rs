@@ -4,7 +4,7 @@
 
 | Name | Type | Default | Nullable | Children | Parents | Comment |
 | ---- | ---- | ------- | -------- | -------- | ------- | ------- |
-| id | uuid |  | false | [public.players](public.players.md) [public.app_state](public.app_state.md) [public.teams](public.teams.md) [public.event_scoring_periods](public.event_scoring_periods.md) [public.quickdraw_matches](public.quickdraw_matches.md) [public.affiliation_categories](public.affiliation_categories.md) |  |  |
+| id | uuid |  | false | [public.players](public.players.md) [public.app_state](public.app_state.md) [public.teams](public.teams.md) [public.event_scoring_periods](public.event_scoring_periods.md) [public.quickdraw_matches](public.quickdraw_matches.md) [public.affiliation_categories](public.affiliation_categories.md) [public.quickdraw_matches_raw](public.quickdraw_matches_raw.md) |  |  |
 | name | text |  | false |  |  |  |
 | venue_name | text |  | true |  |  |  |
 | next_pdn_code | integer | 1 | false |  |  |  |
@@ -40,6 +40,7 @@ erDiagram
 "public.event_scoring_periods" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 "public.quickdraw_matches" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 "public.affiliation_categories" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
+"public.quickdraw_matches_raw" }o--|| "public.events" : "FOREIGN KEY (event_id) REFERENCES events(id)"
 
 "public.events" {
   uuid id
@@ -93,6 +94,26 @@ erDiagram
   uuid event_id FK
   text name
   boolean send_to_devices
+}
+"public.quickdraw_matches_raw" {
+  uuid id
+  uuid event_id FK
+  uuid match_id
+  text mac_address
+  timestamp_with_time_zone received_at
+  text submitted_match_id
+  text player_a_id
+  text player_b_id
+  text player_a_team_id
+  text player_b_team_id
+  numeric_20_0_ player_a_draw_time_ms
+  numeric_20_0_ player_b_draw_time_ms
+  text winner_player_id
+  bigint occurred_at_unix_ms
+  text failure_reason
+  text submitted_mac_address
+  text outcome
+  text comparison_key
 }
 ```
 

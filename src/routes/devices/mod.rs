@@ -4,6 +4,7 @@ mod write;
 pub use read::*;
 pub use write::*;
 
+use crate::proto::alleycat::device::PdnComponentChecks;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use uuid::Uuid;
@@ -16,21 +17,6 @@ pub(super) struct DeviceRecord {
     pub hardware_version: Option<i32>,
     pub mac_address: Option<String>,
     pub created_at: DateTime<Utc>,
-}
-
-/// PDN observations: true means working, false means failed, null means not checked.
-/// Values describe this inspection only; nothing carries forward from older checks.
-#[derive(Debug, PartialEq, Serialize, utoipa::ToSchema)]
-pub(super) struct PdnComponentChecks {
-    pub screen: Option<bool>,
-    pub primary_button: Option<bool>,
-    pub secondary_button: Option<bool>,
-    pub haptics: Option<bool>,
-    pub leds: Option<bool>,
-    pub power_switch: Option<bool>,
-    pub input_jack: Option<bool>,
-    pub output_jack: Option<bool>,
-    pub housing: Option<bool>,
 }
 
 /// Observations from this inspection only; nothing carries forward from older checks.

@@ -18,10 +18,10 @@ pub struct RankedPlayer {
     pub rank: i64,
     /// One point per win in a match saved with scoring_status = scoring.
     pub score: i64,
-    /// Number of scoring matches played, including wins and losses.
+    /// Number of scoring matches played, including wins and losses. Excludes ties.
     pub matches_played: i64,
     /// Mean of this player's draw times in scoring matches, in milliseconds.
-    /// Includes losses and zero measurements; null when matches_played is zero.
+    /// Includes losses and zero measurements; excludes ties. Null when matches_played is zero.
     pub average_draw_time_ms: Option<f64>,
 }
 

@@ -232,7 +232,9 @@ async fn late_uploads_refresh_scores_but_retries_and_switch_changes_do_not_resco
         player_b_team_id: Some(game.teams[1].to_string()),
         player_a_draw_time_ms: Some(i64::MAX as u64),
         player_b_draw_time_ms: Some(0),
-        winner_player_id: game.players[0].to_string(),
+        winner_player_id: Some(game.players[0].to_string()),
+        failure_reason: None,
+        mac_address: None,
         occurred_at_unix_ms: Some(1_790_812_800_000), // 2026-10-01T00:00:00Z
     };
     for _ in 0..2 {
@@ -264,7 +266,7 @@ async fn late_uploads_refresh_scores_but_retries_and_switch_changes_do_not_resco
             .status(),
         200
     );
-    report.winner_player_id = game.players[1].to_string();
+    report.winner_player_id = Some(game.players[1].to_string());
     report.player_a_draw_time_ms = Some(1);
     assert_eq!(
         app.post_protobuf(

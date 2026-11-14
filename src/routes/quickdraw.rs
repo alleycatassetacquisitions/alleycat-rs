@@ -23,8 +23,28 @@ struct NewMatch {
     player_b_team_id: Option<Uuid>,
     player_a_draw_time_ms: i64,
     player_b_draw_time_ms: i64,
-    winner_player_id: Uuid,
+    winner_player_id: Option<Uuid>,
     occurred_at: DateTime<Utc>,
+}
+
+impl NewMatch {
+    fn comparison_key(&self) -> String {
+        let mut players = [
+            (self.player_a_id, self.player_a_draw_time_ms),
+            (self.player_b_id, self.player_b_draw_time_ms),
+        ];
+        players.sort_unstable_by_key(|(id, _)| *id);
+        format!(
+            "{}:{}|{}:{}|{}",
+            players[0].0,
+            players[0].1,
+            players[1].0,
+            players[1].1,
+            self.winner_player_id
+                .map(|id| id.to_string())
+                .unwrap_or_default()
+        )
+    }
 }
 
 struct MatchValidationError {
@@ -63,21 +83,23 @@ fn draw_time(value: Option<u64>, field: &str) -> Result<i64, MatchValidationErro
         .map_err(|_| MatchValidationError::new(&[field], QuickdrawMatchErrorCode::OutOfRange))
 }
 
-impl TryFrom<QuickdrawMatch> for NewMatch {
-    type Error = MatchValidationError;
-
-    fn try_from(value: QuickdrawMatch) -> Result<Self, Self::Error> {
-        let id = parse_id(&value.id, "id")?;
+impl NewMatch {
+    fn from_report(value: QuickdrawMatch, id: Uuid) -> Result<Self, MatchValidationError> {
         let player_a_id = parse_id(&value.player_a_id, "player_a_id")?;
         let player_b_id = parse_id(&value.player_b_id, "player_b_id")?;
-        let winner_player_id = parse_id(&value.winner_player_id, "winner_player_id")?;
+        let winner_player_id = value
+            .winner_player_id
+            .as_deref()
+            .filter(|v| !v.is_empty())
+            .map(|v| parse_id(v, "winner_player_id"))
+            .transpose()?;
         if player_a_id == player_b_id {
             return Err(MatchValidationError::new(
                 &["player_a_id", "player_b_id"],
                 QuickdrawMatchErrorCode::SamePlayer,
             ));
         }
-        if winner_player_id != player_a_id && winner_player_id != player_b_id {
+        if winner_player_id.is_some_and(|winner| winner != player_a_id && winner != player_b_id) {
             return Err(MatchValidationError::new(
                 &["winner_player_id"],
                 QuickdrawMatchErrorCode::InvalidWinner,
@@ -121,6 +143,14 @@ impl TryFrom<QuickdrawMatch> for NewMatch {
 }
 
 fn match_error(error: sqlx::Error) -> actix_web::Error {
+    if error
+        .as_database_error()
+        .and_then(|error| error.code())
+        .as_deref()
+        == Some("22021")
+    {
+        return error::ErrorBadRequest("Match report strings must not contain NUL characters");
+    }
     database_error(error, "Quickdraw operation failed")
 }
 
@@ -139,7 +169,7 @@ fn reference_error(error: &sqlx::Error) -> Option<MatchValidationError> {
 }
 
 #[utoipa::path(
-    tag = "Quickdraw", summary = "Upload completed quickdraw matches",
+    tag = "Quickdraw", summary = "Upload quickdraw match reports",
     description = r##"Send `alleycat.device.WriteQuickdrawMatchesRequest` encoded as binary protobuf.
 Use the [protobuf definition](/docs/device_api.proto) to generate your client messages.
 Supply **1–100 matches**, with a maximum request body of **256 KiB**.
@@ -151,10 +181,13 @@ for message fields, protobuf types, and validation requirements.
 
 ### Validation and scoring
 
-- Players must be distinct, and the explicit winner must be a participant.
+- Reports with a nonblank failure reason are retained only as raw reports; only their match ID is validated.
+- Completed reports require distinct players. A present, nonempty winner must be a participant.
+- An absent or empty winner without a nonblank failure reason is a tie. Ties are saved with scoring_status = tie
+  and excluded from scoreboard points, match counts, and averages.
 - New matches must reference players and teams in this event.
 - Teams are device-supplied match-time snapshots, never inferred from current membership.
-- Scoring uses historical periods at occurrence time. The first applicable outcome wins:
+- For matches with a winner, scoring uses historical periods at occurrence time. The first applicable outcome wins:
   outside a scoring period, closed period with delayed scores disabled, unassigned team,
   same team, otherwise scoring. The delayed-score switch never changes saved results.
 
@@ -164,17 +197,22 @@ for message fields, protobuf types, and validation requirements.
 - 204 means all entries were accepted. 200 returns binary
   [WriteQuickdrawMatchesResponse](/docs/device-apis#alleycat.device.WriteQuickdrawMatchesResponse),
   including when every entry was rejected. Entries not listed were saved or already stored.
-- Request-wide errors and unexpected database failures save no new matches.
+- PostgreSQL rejects NUL characters in submitted strings. The upload returns 400 and rolls back the entire batch.
+- Every decoded entry in a size-valid, NUL-free batch is retained in raw reports once an active event is selected,
+  including duplicates and rejected entries. No active event, invalid protobuf, or invalid batch size saves no reports.
+- A cross-event ID conflict saves raw reports but no completed results. Unexpected database failures roll back both.
+- Raw reports preserve all known submitted fields; unknown protobuf fields are discarded.
 - Valid duplicate reports in the same event succeed without changing stored fields,
   including receipt time and scoring.
-- For repeated IDs within a batch, the first accepted occurrence wins; rejections identify request indices.
+- For repeated IDs within a batch, the first accepted completed occurrence wins; failures do not reserve an ID.
+  Rejections identify request indices.
 - An ID already stored in another event rejects the batch.
 "##,
     request_body(content = inline(ProtobufBody), content_type = "application/protobuf"),
     responses(
         (status = 204, description = "Entire batch accepted or already stored; empty body"),
         (status = 200, description = "Batch processed; protobuf identifies rejected entries, all other entries accepted", body = inline(ProtobufBody), content_type = "application/protobuf"),
-        (status = 400, description = "Invalid protobuf or batch size; no matches saved", body = String, content_type = "text/plain"),
+        (status = 400, description = "Invalid protobuf, batch size, or NUL-containing string; no matches or reports saved", body = String, content_type = "text/plain"),
         (status = 409, description = "No active event or match ID belongs to another event; batch rejected", body = String, content_type = "text/plain"),
         (status = 413, description = "Request body exceeds 256 KiB"),
         (status = 415, description = "Expected application/protobuf"),
@@ -210,6 +248,47 @@ pub async fn write_quickdraw_matches(
         .fetch_one(&mut *transaction)
         .await
         .map_err(match_error)?;
+    let mut raw_ids = Vec::with_capacity(batch.matches.len());
+    for report in &batch.matches {
+        let raw_id = Uuid::new_v4();
+        // PostgreSQL bigint cannot hold every protobuf uint64. Bind decimal text
+        // and cast to numeric so rejected out-of-range values remain queryable.
+        let player_a_draw_time = report.player_a_draw_time_ms.map(|v| v.to_string());
+        let player_b_draw_time = report.player_b_draw_time_ms.map(|v| v.to_string());
+        let match_id = Uuid::parse_str(&report.id).ok();
+        let mac = report
+            .mac_address
+            .as_deref()
+            .filter(|mac| !mac.trim().is_empty());
+        sqlx::query!(
+            "INSERT INTO quickdraw_matches_raw
+                (id, event_id, match_id, mac_address, submitted_match_id,
+                 player_a_id, player_b_id, player_a_team_id, player_b_team_id,
+                 player_a_draw_time_ms, player_b_draw_time_ms, winner_player_id,
+                 occurred_at_unix_ms, failure_reason, submitted_mac_address)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                     $10::text::numeric, $11::text::numeric, $12, $13, $14, $15)",
+            raw_id,
+            event_id,
+            match_id,
+            mac,
+            report.id,
+            report.player_a_id,
+            report.player_b_id,
+            report.player_a_team_id,
+            report.player_b_team_id,
+            player_a_draw_time,
+            player_b_draw_time,
+            report.winner_player_id,
+            report.occurred_at_unix_ms,
+            report.failure_reason,
+            report.mac_address
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(match_error)?;
+        raw_ids.push(raw_id);
+    }
     let conflicting_id: Option<Uuid> = sqlx::query_scalar(
         "SELECT id FROM quickdraw_matches WHERE id = ANY($1) AND event_id <> $2 LIMIT 1",
     )
@@ -219,13 +298,35 @@ pub async fn write_quickdraw_matches(
     .await
     .map_err(match_error)?;
     if conflicting_id.is_some() {
+        transaction.commit().await.map_err(match_error)?;
         return Err(error::ErrorConflict(
             "Match ID already belongs to another event",
         ));
     }
     for (index, raw_report) in batch.matches.into_iter().enumerate() {
         let match_id = raw_report.id.clone();
-        let report = match NewMatch::try_from(raw_report) {
+        let id = match parse_id(&raw_report.id, "id") {
+            Ok(id) => id,
+            Err(error) => {
+                rejected.push(error.rejection(index, match_id));
+                continue;
+            }
+        };
+        if raw_report
+            .failure_reason
+            .as_deref()
+            .is_some_and(|reason| !reason.trim().is_empty())
+        {
+            sqlx::query!(
+                "UPDATE quickdraw_matches_raw SET outcome = 'failed' WHERE id = $1",
+                raw_ids[index]
+            )
+            .execute(&mut *transaction)
+            .await
+            .map_err(match_error)?;
+            continue;
+        }
+        let report = match NewMatch::from_report(raw_report, id) {
             Ok(report) => report,
             Err(error) => {
                 rejected.push(error.rejection(index, match_id));
@@ -242,6 +343,7 @@ pub async fn write_quickdraw_matches(
               player_a_draw_time_ms, player_b_draw_time_ms, winner_player_id, occurred_at, scoring_status)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                 (CASE
+                    WHEN $9::uuid IS NULL THEN 'tie'
                     WHEN NOT EXISTS (SELECT 1 FROM event_scoring_periods
                         WHERE event_id = $2 AND started_at <= $10
                         AND (closes_at IS NULL OR $10 < closes_at)) THEN 'scoring_disabled'
@@ -286,6 +388,21 @@ pub async fn write_quickdraw_matches(
                 ));
             }
         }
+        let outcome = if report.winner_player_id.is_some() {
+            "completed"
+        } else {
+            "tie"
+        };
+        let comparison_key = report.comparison_key();
+        sqlx::query!(
+            "UPDATE quickdraw_matches_raw SET outcome = $1, comparison_key = $2 WHERE id = $3",
+            outcome,
+            comparison_key,
+            raw_ids[index]
+        )
+        .execute(&mut *entry)
+        .await
+        .map_err(match_error)?;
         entry.commit().await.map_err(match_error)?;
     }
     transaction.commit().await.map_err(match_error)?;
@@ -307,6 +424,7 @@ enum ScoringStatus {
     ScoringDisabled,
     UnassignedTeam,
     DelayedScoresDisabled,
+    Tie,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -319,7 +437,7 @@ struct MatchResponse {
     player_b_team_id: Option<Uuid>,
     player_a_draw_time_ms: i64,
     player_b_draw_time_ms: i64,
-    winner_player_id: Uuid,
+    winner_player_id: Option<Uuid>,
     occurred_at: DateTime<Utc>,
     received_at: DateTime<Utc>,
     scoring_status: ScoringStatus,
@@ -333,7 +451,7 @@ pub struct GetQuickdrawMatchesResponse {
 
 #[utoipa::path(
     tag = "Quickdraw", summary = "List quickdraw matches in the active event",
-    description = "Returns saved results, including non-scoring matches, ordered by occurred_at descending then ID descending. Teams and scoring status are historical snapshots. Uses the active event; returns 409 when none is selected. Offset pagination reflects current records; late uploads can shift pages.",
+    description = "Returns saved results, including non-scoring ties with a null winner, ordered by occurred_at descending then ID descending. Teams and scoring status are historical snapshots. Uses the active event; returns 409 when none is selected. Offset pagination reflects current records; late uploads can shift pages.",
     params(PaginationQuery),
     responses(
         (status = 200, description = "Matches and effective pagination", body = GetQuickdrawMatchesResponse),
