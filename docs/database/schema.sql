@@ -27,13 +27,6 @@ CREATE TYPE public.event_uuid_range AS RANGE (
 
 
 --
--- Name: TYPE event_uuid_range; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TYPE public.event_uuid_range IS 'Singleton event UUID ranges let the scoring-period exclusion constraint compare events using core GiST range operators, without btree_gist. Construct both bounds from the same UUID with inclusive bounds.';
-
-
---
 -- Name: quickdraw_scoring_status; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -65,20 +58,6 @@ CREATE TABLE public.affiliation_categories (
 
 
 --
--- Name: TABLE affiliation_categories; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.affiliation_categories IS 'Operator-defined affiliation categories within an event. No seeded categories or implied gameplay behavior.';
-
-
---
--- Name: COLUMN affiliation_categories.send_to_devices; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.affiliation_categories.send_to_devices IS 'Include assignments in this category in device player lookups. Defaults to false; staff responses always include all assignments.';
-
-
---
 -- Name: affiliations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -89,13 +68,6 @@ CREATE TABLE public.affiliations (
     name text NOT NULL,
     CONSTRAINT affiliations_name_check CHECK (((name <> ''::text) AND (name = btrim(name)) AND (char_length(name) <= 256)))
 );
-
-
---
--- Name: TABLE affiliations; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.affiliations IS 'Operator-defined affiliations within a category. Names have no implicit gameplay or permission behavior.';
 
 
 --
@@ -128,34 +100,6 @@ CREATE TABLE public.device_inspections (
     CONSTRAINT device_inspections_inspected_at_check CHECK (((inspected_at >= '1970-01-01 00:00:00+00'::timestamp with time zone) AND (inspected_at <= '9999-12-31 23:59:59.999+00'::timestamp with time zone))),
     CONSTRAINT device_inspections_notes_check CHECK ((octet_length(notes) <= 2048))
 );
-
-
---
--- Name: TABLE device_inspections; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.device_inspections IS 'Saved condition checks. Each row is a complete snapshot; missing checks are unknown, never inherited from earlier inspections. API writes never replace an accepted inspection.';
-
-
---
--- Name: COLUMN device_inspections.inspected_at; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.device_inspections.inspected_at IS 'Client-reported check time in UTC. Latest condition uses this time, then received_at and ID descending to resolve ties.';
-
-
---
--- Name: COLUMN device_inspections.firmware_commit_hash; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.device_inspections.firmware_commit_hash IS 'Firmware observed during this check, not a mutable device attribute. Null means not recorded.';
-
-
---
--- Name: COLUMN device_inspections.powers_on; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.device_inspections.powers_on IS 'Whether the device powered on during this inspection. True means it did, false means an attempted power-on failed, and null means not checked. Independent of component results; never inherited from older inspections.';
 
 
 --
@@ -200,20 +144,6 @@ CREATE TABLE public.devices (
 
 
 --
--- Name: TABLE devices; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.devices IS 'Physical device inventory shared across events. IDs and printed labels identify devices independently of inspection history. Currently supports PDNs.';
-
-
---
--- Name: COLUMN devices.mac_address; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.devices.mac_address IS 'Optional 48-bit hardware address. Unique when known; not the permanent inventory identity.';
-
-
---
 -- Name: event_scoring_periods; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -225,27 +155,6 @@ CREATE TABLE public.event_scoring_periods (
     CONSTRAINT event_scoring_periods_finite_times CHECK ((isfinite(started_at) AND ((closes_at IS NULL) OR isfinite(closes_at)))),
     CONSTRAINT event_scoring_periods_time_order CHECK ((closes_at > started_at))
 );
-
-
---
--- Name: TABLE event_scoring_periods; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.event_scoring_periods IS 'Event scoring history. Opening creates a row; closing fills closes_at. Match eligibility uses device occurrence time, not upload time. No unclosed period means scoring is disabled.';
-
-
---
--- Name: COLUMN event_scoring_periods.started_at; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.event_scoring_periods.started_at IS 'Inclusive scoring start instant. Stored as timestamptz; devices report UTC.';
-
-
---
--- Name: COLUMN event_scoring_periods.closes_at; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.event_scoring_periods.closes_at IS 'Exclusive scoring end instant. NULL means this period is still open. Closing a period preserves its history.';
 
 
 --
@@ -261,13 +170,6 @@ CREATE TABLE public.events (
     accepting_delayed_scores boolean DEFAULT true NOT NULL,
     CONSTRAINT events_next_pdn_code_check CHECK (((next_pdn_code >= 1) AND (next_pdn_code <= 10000)))
 );
-
-
---
--- Name: COLUMN events.accepting_delayed_scores; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.events.accepting_delayed_scores IS 'Reversible per-event switch, default true. When false, new matches from closed scoring periods are recorded as delayed_scores_disabled. Open-period scoring and previously accepted results are unchanged.';
 
 
 --
@@ -291,76 +193,6 @@ CREATE TABLE public.pdn_inspection_checks (
 
 
 --
--- Name: TABLE pdn_inspection_checks; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.pdn_inspection_checks IS 'PDN component observations for one inspection. Shared identity, timestamps, firmware, and notes live in device_inspections. Other device classes can define their own checks.';
-
-
---
--- Name: COLUMN pdn_inspection_checks.screen; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.pdn_inspection_checks.screen IS 'True means working, false means failed, null means not checked during this inspection.';
-
-
---
--- Name: COLUMN pdn_inspection_checks.primary_button; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.pdn_inspection_checks.primary_button IS 'True means working, false means failed, null means not checked during this inspection.';
-
-
---
--- Name: COLUMN pdn_inspection_checks.secondary_button; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.pdn_inspection_checks.secondary_button IS 'True means working, false means failed, null means not checked during this inspection.';
-
-
---
--- Name: COLUMN pdn_inspection_checks.haptics; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.pdn_inspection_checks.haptics IS 'True means working, false means failed, null means not checked during this inspection.';
-
-
---
--- Name: COLUMN pdn_inspection_checks.leds; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.pdn_inspection_checks.leds IS 'True means working, false means failed, null means not checked during this inspection.';
-
-
---
--- Name: COLUMN pdn_inspection_checks.power_switch; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.pdn_inspection_checks.power_switch IS 'True means working, false means failed, null means not checked during this inspection.';
-
-
---
--- Name: COLUMN pdn_inspection_checks.input_jack; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.pdn_inspection_checks.input_jack IS 'True means working, false means failed, null means not checked during this inspection.';
-
-
---
--- Name: COLUMN pdn_inspection_checks.output_jack; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.pdn_inspection_checks.output_jack IS 'True means working, false means failed, null means not checked during this inspection.';
-
-
---
--- Name: COLUMN pdn_inspection_checks.housing; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.pdn_inspection_checks.housing IS 'True means working, false means failed, null means not checked during this inspection.';
-
-
---
 -- Name: player_affiliations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -370,13 +202,6 @@ CREATE TABLE public.player_affiliations (
     category_id uuid NOT NULL,
     affiliation_id uuid NOT NULL
 );
-
-
---
--- Name: TABLE player_affiliations; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.player_affiliations IS 'At most one affiliation per player per category. Composite foreign keys keep player, category, and affiliation in the same event. Clearing an assignment deletes its row; changes do not affect scores.';
 
 
 --
@@ -394,13 +219,6 @@ CREATE TABLE public.players (
     active boolean DEFAULT true NOT NULL,
     CONSTRAINT players_pdn_code_check CHECK ((pdn_code ~ '^[0-9]{4}$'::text))
 );
-
-
---
--- Name: COLUMN players.active; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.players.active IS 'Reversible registration/device status, initially true. Inactive players retain their PIN, name, event, and match history and remain discoverable. This flag does not change accepted scores or reject delayed match uploads.';
 
 
 --
@@ -433,55 +251,6 @@ CASE
 END))))),
     CONSTRAINT quickdraw_matches_winner_is_participant CHECK (((winner_player_id = player_a_id) OR (winner_player_id = player_b_id)))
 );
-
-
---
--- Name: COLUMN quickdraw_matches.player_a_id; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.quickdraw_matches.player_a_id IS 'First participant slot, not a Hunter/Bounty role. Device reports must identify the same shared duel ID.';
-
-
---
--- Name: COLUMN quickdraw_matches.player_a_team_id; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.quickdraw_matches.player_a_team_id IS 'Team credited at match time, supplied by ingestion; NULL means unassigned. Historical snapshot, not a reference to current player membership.';
-
-
---
--- Name: COLUMN quickdraw_matches.player_b_team_id; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.quickdraw_matches.player_b_team_id IS 'Team credited at match time, supplied by ingestion; NULL means unassigned. Historical snapshot, not a reference to current player membership.';
-
-
---
--- Name: COLUMN quickdraw_matches.player_a_draw_time_ms; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.quickdraw_matches.player_a_draw_time_ms IS 'Device-measured draw duration in milliseconds. Nonnegative; zero is a measurement, not a missing-value sentinel.';
-
-
---
--- Name: COLUMN quickdraw_matches.player_b_draw_time_ms; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.quickdraw_matches.player_b_draw_time_ms IS 'Device-measured draw duration in milliseconds. Nonnegative; zero is a measurement, not a missing-value sentinel.';
-
-
---
--- Name: COLUMN quickdraw_matches.occurred_at; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.quickdraw_matches.occurred_at IS 'Trusted UTC device timestamp from the first accepted upload. Use for scoring periods, daily boundaries and match chronology.';
-
-
---
--- Name: COLUMN quickdraw_matches.received_at; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.quickdraw_matches.received_at IS 'Defaults to the database clock at insertion. Ingestion must omit this field and preserve the first accepted result on duplicate uploads. Not the time used for scoring eligibility.';
 
 
 --

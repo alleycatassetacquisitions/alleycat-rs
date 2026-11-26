@@ -3,8 +3,6 @@ CREATE TYPE public.event_uuid_range AS RANGE (
     multirange_type_name = public.event_uuid_multirange
 );
 
-COMMENT ON TYPE public.event_uuid_range IS 'Singleton event UUID ranges let the scoring-period exclusion constraint compare events using core GiST range operators, without btree_gist. Construct both bounds from the same UUID with inclusive bounds.';
-
 CREATE TYPE public.quickdraw_scoring_status AS ENUM (
     'scoring',
     'same_team',
@@ -25,8 +23,6 @@ CREATE TABLE public.events (
     CONSTRAINT events_pkey PRIMARY KEY (id)
 );
 
-COMMENT ON COLUMN public.events.accepting_delayed_scores IS 'Reversible per-event switch, default true. When false, new matches from closed scoring periods are recorded as delayed_scores_disabled. Open-period scoring and previously accepted results are unchanged.';
-
 CREATE TABLE public.devices (
     id uuid NOT NULL,
     id_label integer NOT NULL,
@@ -43,10 +39,6 @@ CREATE TABLE public.devices (
     CONSTRAINT devices_mac_address_key UNIQUE (mac_address),
     CONSTRAINT devices_pkey PRIMARY KEY (id)
 );
-
-COMMENT ON TABLE public.devices IS 'Physical device inventory shared across events. IDs and printed labels identify devices independently of inspection history. Currently supports PDNs.';
-
-COMMENT ON COLUMN public.devices.mac_address IS 'Optional 48-bit hardware address. Unique when known; not the permanent inventory identity.';
 
 CREATE TABLE public.device_logs (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -87,10 +79,6 @@ CREATE TABLE public.affiliation_categories (
     CONSTRAINT affiliation_categories_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id)
 );
 
-COMMENT ON TABLE public.affiliation_categories IS 'Operator-defined affiliation categories within an event. No seeded categories or implied gameplay behavior.';
-
-COMMENT ON COLUMN public.affiliation_categories.send_to_devices IS 'Include assignments in this category in device player lookups. Defaults to false; staff responses always include all assignments.';
-
 CREATE TABLE public.app_state (
     id integer NOT NULL,
     active_event_id uuid,
@@ -106,16 +94,11 @@ CREATE TABLE public.event_scoring_periods (
     closes_at timestamp with time zone,
     CONSTRAINT event_scoring_periods_finite_times CHECK ((isfinite(started_at) AND ((closes_at IS NULL) OR isfinite(closes_at)))),
     CONSTRAINT event_scoring_periods_time_order CHECK ((closes_at > started_at)),
+    -- A single-UUID range lets GiST check for overlapping periods within each event.
     CONSTRAINT event_scoring_periods_no_overlap EXCLUDE USING gist (public.event_uuid_range(event_id, event_id, '[]'::text) WITH &&, tstzrange(started_at, closes_at, '[)'::text) WITH &&),
     CONSTRAINT event_scoring_periods_pkey PRIMARY KEY (id),
     CONSTRAINT event_scoring_periods_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id)
 );
-
-COMMENT ON TABLE public.event_scoring_periods IS 'Event scoring history. Opening creates a row; closing fills closes_at. Match eligibility uses device occurrence time, not upload time. No unclosed period means scoring is disabled.';
-
-COMMENT ON COLUMN public.event_scoring_periods.started_at IS 'Inclusive scoring start instant. Stored as timestamptz; devices report UTC.';
-
-COMMENT ON COLUMN public.event_scoring_periods.closes_at IS 'Exclusive scoring end instant. NULL means this period is still open. Closing a period preserves its history.';
 
 CREATE INDEX event_scoring_periods_event_id_idx ON public.event_scoring_periods USING btree (event_id);
 
@@ -179,14 +162,6 @@ CREATE TABLE public.device_inspections (
     CONSTRAINT device_inspections_device_id_device_kind_fkey FOREIGN KEY (device_id, device_kind) REFERENCES public.devices(id, device_kind)
 );
 
-COMMENT ON TABLE public.device_inspections IS 'Saved condition checks. Each row is a complete snapshot; missing checks are unknown, never inherited from earlier inspections. API writes never replace an accepted inspection.';
-
-COMMENT ON COLUMN public.device_inspections.inspected_at IS 'Client-reported check time in UTC. Latest condition uses this time, then received_at and ID descending to resolve ties.';
-
-COMMENT ON COLUMN public.device_inspections.firmware_commit_hash IS 'Firmware observed during this check, not a mutable device attribute. Null means not recorded.';
-
-COMMENT ON COLUMN public.device_inspections.powers_on IS 'Whether the device powered on during this inspection. True means it did, false means an attempted power-on failed, and null means not checked. Independent of component results; never inherited from older inspections.';
-
 CREATE INDEX device_inspections_latest_idx ON public.device_inspections USING btree (device_id, inspected_at DESC, received_at DESC, id DESC);
 
 CREATE TABLE public.affiliations (
@@ -200,8 +175,6 @@ CREATE TABLE public.affiliations (
     CONSTRAINT affiliations_pkey PRIMARY KEY (id),
     CONSTRAINT affiliations_category_fkey FOREIGN KEY (event_id, category_id) REFERENCES public.affiliation_categories(event_id, id)
 );
-
-COMMENT ON TABLE public.affiliations IS 'Operator-defined affiliations within a category. Names have no implicit gameplay or permission behavior.';
 
 CREATE TABLE public.players (
     id uuid NOT NULL,
@@ -220,8 +193,6 @@ CREATE TABLE public.players (
     CONSTRAINT players_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id),
     CONSTRAINT players_event_team_fkey FOREIGN KEY (event_id, team_id) REFERENCES public.teams(event_id, id)
 );
-
-COMMENT ON COLUMN public.players.active IS 'Reversible registration/device status, initially true. Inactive players retain their PIN, name, event, and match history and remain discoverable. This flag does not change accepted scores or reject delayed match uploads.';
 
 CREATE INDEX players_event_created_at_id_idx ON public.players USING btree (event_id, created_at DESC, id DESC);
 
@@ -242,26 +213,6 @@ CREATE TABLE public.pdn_inspection_checks (
     CONSTRAINT pdn_inspection_checks_inspection_id_device_kind_fkey FOREIGN KEY (inspection_id, device_kind) REFERENCES public.device_inspections(id, device_kind)
 );
 
-COMMENT ON TABLE public.pdn_inspection_checks IS 'PDN component observations for one inspection. Shared identity, timestamps, firmware, and notes live in device_inspections. Other device classes can define their own checks.';
-
-COMMENT ON COLUMN public.pdn_inspection_checks.screen IS 'True means working, false means failed, null means not checked during this inspection.';
-
-COMMENT ON COLUMN public.pdn_inspection_checks.primary_button IS 'True means working, false means failed, null means not checked during this inspection.';
-
-COMMENT ON COLUMN public.pdn_inspection_checks.secondary_button IS 'True means working, false means failed, null means not checked during this inspection.';
-
-COMMENT ON COLUMN public.pdn_inspection_checks.haptics IS 'True means working, false means failed, null means not checked during this inspection.';
-
-COMMENT ON COLUMN public.pdn_inspection_checks.leds IS 'True means working, false means failed, null means not checked during this inspection.';
-
-COMMENT ON COLUMN public.pdn_inspection_checks.power_switch IS 'True means working, false means failed, null means not checked during this inspection.';
-
-COMMENT ON COLUMN public.pdn_inspection_checks.input_jack IS 'True means working, false means failed, null means not checked during this inspection.';
-
-COMMENT ON COLUMN public.pdn_inspection_checks.output_jack IS 'True means working, false means failed, null means not checked during this inspection.';
-
-COMMENT ON COLUMN public.pdn_inspection_checks.housing IS 'True means working, false means failed, null means not checked during this inspection.';
-
 CREATE TABLE public.player_affiliations (
     event_id uuid NOT NULL,
     player_id uuid NOT NULL,
@@ -271,8 +222,6 @@ CREATE TABLE public.player_affiliations (
     CONSTRAINT player_affiliations_affiliation_fkey FOREIGN KEY (event_id, category_id, affiliation_id) REFERENCES public.affiliations(event_id, category_id, id),
     CONSTRAINT player_affiliations_player_fkey FOREIGN KEY (event_id, player_id) REFERENCES public.players(event_id, id)
 );
-
-COMMENT ON TABLE public.player_affiliations IS 'At most one affiliation per player per category. Composite foreign keys keep player, category, and affiliation in the same event. Clearing an assignment deletes its row; changes do not affect scores.';
 
 CREATE INDEX player_affiliations_affiliation_idx ON public.player_affiliations USING btree (event_id, category_id, affiliation_id);
 
@@ -308,20 +257,6 @@ END))))),
     CONSTRAINT quickdraw_matches_team_a_fkey FOREIGN KEY (event_id, player_a_team_id) REFERENCES public.teams(event_id, id),
     CONSTRAINT quickdraw_matches_team_b_fkey FOREIGN KEY (event_id, player_b_team_id) REFERENCES public.teams(event_id, id)
 );
-
-COMMENT ON COLUMN public.quickdraw_matches.player_a_id IS 'First participant slot, not a Hunter/Bounty role. Device reports must identify the same shared duel ID.';
-
-COMMENT ON COLUMN public.quickdraw_matches.player_a_team_id IS 'Team credited at match time, supplied by ingestion; NULL means unassigned. Historical snapshot, not a reference to current player membership.';
-
-COMMENT ON COLUMN public.quickdraw_matches.player_b_team_id IS 'Team credited at match time, supplied by ingestion; NULL means unassigned. Historical snapshot, not a reference to current player membership.';
-
-COMMENT ON COLUMN public.quickdraw_matches.player_a_draw_time_ms IS 'Device-measured draw duration in milliseconds. Nonnegative; zero is a measurement, not a missing-value sentinel.';
-
-COMMENT ON COLUMN public.quickdraw_matches.player_b_draw_time_ms IS 'Device-measured draw duration in milliseconds. Nonnegative; zero is a measurement, not a missing-value sentinel.';
-
-COMMENT ON COLUMN public.quickdraw_matches.occurred_at IS 'Trusted UTC device timestamp from the first accepted upload. Use for scoring periods, daily boundaries and match chronology.';
-
-COMMENT ON COLUMN public.quickdraw_matches.received_at IS 'Defaults to the database clock at insertion. Ingestion must omit this field and preserve the first accepted result on duplicate uploads. Not the time used for scoring eligibility.';
 
 CREATE INDEX quickdraw_matches_event_occurred_at_id_idx ON public.quickdraw_matches USING btree (event_id, occurred_at DESC, id DESC);
 

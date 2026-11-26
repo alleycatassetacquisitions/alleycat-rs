@@ -1,6 +1,6 @@
 # On a conflict, keep main's and run reylo migrate dev
 version: 1
-schema: 0039de1a
+schema: 3cdc2765
 migrations:
   - name: 20260606015250_create_subscriptions_table.sql
     checksum: 94c8c75a
@@ -30,3 +30,5 @@ migrations:
     checksum: 5c64663c
   - name: 20261114000000_retain_raw_quickdraw_reports.sql
     checksum: fad621f1
+  - name: 20261125000000_remove_stored_schema_comments.sql
+    checksum: 73a1bf49
