@@ -5,7 +5,7 @@ use clap::Subcommand;
 use std::{
     fs,
     io::Write,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command as Process, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -19,12 +19,12 @@ pub enum Command {
         #[arg(long)]
         check: bool,
     },
-    /// Export schema.sql and tbls Markdown using a disposable PostgreSQL 18 container.
+    /// Export schema.sql using a disposable PostgreSQL 18 container.
     Db {
         /// Output directory, relative to the repository root unless absolute.
         #[arg(long, default_value = "docs/database")]
         output: PathBuf,
-        /// Fail if generated files differ from the output directory; do not write files.
+        /// Check that schema.sql matches the migrations without rewriting it.
         #[arg(long)]
         check: bool,
         /// Verify the reset inventory in a second, freshly created container database.
@@ -169,67 +169,20 @@ fn generate(output: PathBuf, check: bool, check_reset: bool) -> Result<()> {
     if check {
         if fs::read(&schema_path).ok().as_deref() != Some(schema.as_bytes()) {
             bail!(
-                "Database documentation is stale or missing: {}. Run cargo xtask docs db (with the same --output, if specified) and commit the generated files.",
+                "Database documentation is stale or missing: {}. Run cargo xtask docs db (with the same --output, if specified) and commit the updated schema.sql.",
                 schema_path.display()
             );
         }
+        println!("Database schema snapshot is up to date.");
     } else {
         fs::create_dir_all(&output)?;
         fs::write(&schema_path, schema)?;
         println!("Generated {}", schema_path.display());
     }
-    db.document(&output, check)?;
-    if check {
-        println!("Database documentation is up to date.");
-    }
     Ok(())
 }
 
 impl Database {
-    fn document(&self, output: &Path, check: bool) -> Result<()> {
-        let output = output
-            .canonicalize()
-            .context("database documentation directory is missing")?;
-        let config = project_root()?.join(".tbls.yml");
-        let network = format!("container:{}", self.0);
-        let config_mount = format!("type=bind,src={},dst=/tbls.yml,readonly", config.display());
-        let output_mount = format!(
-            "type=bind,src={},dst=/docs{}",
-            output.display(),
-            if check { ",readonly" } else { "" }
-        );
-        // Join only the disposable database's isolated network namespace.
-        // The schema/ subdirectory is exclusively tbls-generated: --rm-dist
-        // removes obsolete table pages without touching the sibling SQL dump.
-        let mut command = Process::new("docker");
-        command.args([
-            "run",
-            "--rm",
-            "--network",
-            &network,
-            "--mount",
-            &config_mount,
-            "--mount",
-            &output_mount,
-            "ghcr.io/k1low/tbls:v1.96.1",
-            if check { "diff" } else { "doc" },
-            "--config",
-            "/tbls.yml",
-            "postgres://postgres@127.0.0.1:5432/docs?sslmode=disable",
-            "/docs/schema",
-        ]);
-        if !check {
-            command.args(["--force", "--rm-dist"]);
-        }
-        let status = command.status().context("could not run tbls in Docker")?;
-        if !status.success() {
-            bail!(
-                "tbls failed with {status}; run cargo xtask docs db to regenerate stale documentation"
-            );
-        }
-        Ok(())
-    }
-
     fn sql(&self, database: &str, sql: &[u8]) -> Result<String> {
         docker(
             &[

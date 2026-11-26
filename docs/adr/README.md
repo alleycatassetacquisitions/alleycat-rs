@@ -23,7 +23,7 @@ the transcript of the discussion. Flag unknown rationale rather than invent it.
 
 Keep HTTP contracts in OpenAPI, device contracts in
 [protobuf comments](../../proto/device_api.proto), schema details in the
-[database reference](../database/schema/README.md), and operating instructions in
+[database reference](../database/schema.sql), and operating instructions in
 the [project README](../../readme.md). Link to them rather than duplicate fields,
 validation rules, endpoint inventories, or implementation walkthroughs.
 

@@ -26,5 +26,5 @@ and delayed second reports limit what those counts can establish.
 - [Device contract](../../proto/device_api.proto)
 - [Upload and match listing](../../src/routes/quickdraw.rs)
 - [Raw report endpoints](../../src/routes/quickdraw_reports.rs)
-- [Raw report schema](../database/schema/public.quickdraw_matches_raw.md)
+- [SQL schema](../database/schema.sql)
 - [Scoreboard decision](player-scoreboard.md)
