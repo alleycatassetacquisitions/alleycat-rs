@@ -1,8 +1,6 @@
 # Documentation maintenance
 
-Database documentation is generated from migrations using
-[tbls](https://github.com/k1LoW/tbls) for Markdown and Mermaid diagrams, and
-`pg_dump` for the complete PostgreSQL schema. Migrations remain the source of truth.
+The database reference is a PostgreSQL schema dump generated from the migrations.
 
 ## Generate and check
 
@@ -19,26 +17,16 @@ cargo xtask docs db --check --check-reset
 ```
 
 The command starts a disposable PostgreSQL 18 container with no external network,
-published ports, or persistent volumes. A version-pinned tbls container joins only
-that database's network namespace. Docker downloads its image on first use; no
-local tbls installation is needed. [`.tbls.yml`](../../../.tbls.yml) controls
-presentation using upstream templates. The runner supplies the disposable database
-DSN explicitly and never uses application database settings or `REMOTE_DB_URL`.
+published ports, or persistent volumes.
 Migrations run as a role with `USAGE` and `CREATE` on the `public` schema, but
 without superuser or database-level `CREATE` privileges. This also checks that
 fresh installation works with the restricted App Platform dev database role.
 
 ## Generated output
 
-Commit regenerated changes under `docs/database/` alongside migration changes:
-
-- `schema/` contains tbls pages and is entirely replaced on regeneration, including
-  removal of obsolete table pages. Keep handwritten documentation outside it.
-- `schema.sql` includes the full schema, including enum values and routines.
-
-`--output PATH` places `schema/` and `schema.sql` under another directory.
-`--check` compares the SQL dump and runs `tbls diff` with the documentation mounted
-read-only.
+Commit the regenerated [SQL snapshot](../../../docs/database/schema.sql) alongside migration changes.
+Use `--output PATH` to write `schema.sql` to another directory. Use `--check`
+to compare the snapshot there with a fresh dump without rewriting it.
 
 ## Reset verification
 

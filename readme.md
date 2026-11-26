@@ -90,9 +90,7 @@ For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/R
 
 ## Database documentation
 
-Browse the [database reference](docs/database/schema/README.md) for tables,
-relationships, and diagrams, or the [SQL schema](docs/database/schema.sql) for
-complete PostgreSQL definitions. Both are generated from the migrations.
+The [SQL schema](docs/database/schema.sql) shows the PostgreSQL definitions produced by the migrations.
 
 For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/README.md).
 
