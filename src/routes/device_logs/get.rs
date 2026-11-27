@@ -2,7 +2,7 @@ use crate::routes::helpers::errors::database_error;
 use crate::routes::helpers::pagination::{Pagination, PaginationQuery};
 use actix_web::get;
 use actix_web::web;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ struct DeviceLogResponse {
     device_mac: String,
     crash_number: i64,
     uptime_ms: i64,
-    received_at: DateTime<Utc>,
+    received_at: Timestamp,
     software_version: Option<String>,
     reset_reason: i32,
     program_counter: Option<i64>,
@@ -70,7 +70,7 @@ async fn fetch_device_logs(
             device_mac::text AS "device_mac!",
             crash_number,
             uptime_ms,
-            received_at,
+            received_at AS "received_at: jiff_sqlx::Timestamp",
             software_version,
             reset_reason,
             program_counter,

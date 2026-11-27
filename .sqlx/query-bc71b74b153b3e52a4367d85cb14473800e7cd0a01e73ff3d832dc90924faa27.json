@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT DISTINCT ON (i.device_id) i.id, i.device_id, i.inspected_at, i.received_at, i.firmware_commit_hash, i.notes, i.powers_on, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing\n         FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = ANY($1)\n         ORDER BY i.device_id, i.inspected_at DESC, i.received_at DESC, i.id DESC",
+  "query": "SELECT DISTINCT ON (i.device_id) i.id, i.device_id, i.inspected_at AS \"inspected_at: jiff_sqlx::Timestamp\", i.received_at AS \"received_at: jiff_sqlx::Timestamp\", i.firmware_commit_hash, i.notes, i.powers_on, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing\n         FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = ANY($1)\n         ORDER BY i.device_id, i.inspected_at DESC, i.received_at DESC, i.id DESC",
   "describe": {
     "columns": [
       {
@@ -15,12 +15,12 @@
       },
       {
         "ordinal": 2,
-        "name": "inspected_at",
+        "name": "inspected_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       },
       {
         "ordinal": 3,
-        "name": "received_at",
+        "name": "received_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       },
       {
@@ -108,5 +108,5 @@
       true
     ]
   },
-  "hash": "de59bda80dfcdc35362cc396ee0918439b6f2b34084db66b75c72f0211dca64c"
+  "hash": "bc71b74b153b3e52a4367d85cb14473800e7cd0a01e73ff3d832dc90924faa27"
 }

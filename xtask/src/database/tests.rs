@@ -10,7 +10,7 @@ impl TempDir {
         let path = std::env::temp_dir().join(format!(
             "alleycat-recovery-{}-{}",
             std::process::id(),
-            chrono::Utc::now().timestamp_nanos_opt().unwrap()
+            jiff::Timestamp::now().as_nanosecond()
         ));
         fs::create_dir(&path).unwrap();
         Self(path)
@@ -144,7 +144,7 @@ fn whole_database_recovery() {
     let name = format!(
         "alleycat-recovery-{}-{}",
         std::process::id(),
-        chrono::Utc::now().timestamp_nanos_opt().unwrap()
+        jiff::Timestamp::now().as_nanosecond()
     );
     checked(Command::new("docker").args([
         "run",

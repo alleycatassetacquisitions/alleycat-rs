@@ -3,7 +3,8 @@ use alleycat_rs::proto::alleycat::device::{
     QuickdrawMatch, QuickdrawMatchErrorCode, QuickdrawMatchRejection, WriteQuickdrawMatchesRequest,
     WriteQuickdrawMatchesResponse,
 };
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use prost::Message;
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -68,8 +69,8 @@ impl Game {
 
     async fn period(&self, app: &TestApp, start: i64, end: Option<i64>) {
         sqlx::query("INSERT INTO event_scoring_periods (event_id, started_at, closes_at) VALUES ($1, $2, $3)")
-            .bind(self.event).bind(DateTime::from_timestamp_millis(start).unwrap())
-            .bind(end.map(|ms| DateTime::from_timestamp_millis(ms).unwrap()))
+            .bind(self.event).bind(Timestamp::from_millisecond(start).unwrap().to_sqlx())
+            .bind(end.map(|ms| Timestamp::from_millisecond(ms).unwrap().to_sqlx()))
             .execute(&app.db_pool).await.unwrap();
     }
 }
@@ -105,14 +106,14 @@ async fn delayed_matches_use_period_boundaries_and_device_team_snapshots() {
     reports[4].player_b_team_id = reports[4].player_a_team_id.clone();
     reports[5].player_a_team_id = None;
     reports[6].player_a_team_id = None;
-    let before: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
+    let before: jiff_sqlx::Timestamp = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&app.db_pool)
         .await
         .unwrap();
     let response = upload(&app, reports).await;
     assert_eq!(response.status(), 204);
     assert!(response.bytes().await.unwrap().is_empty());
-    let after: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
+    let after: jiff_sqlx::Timestamp = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&app.db_pool)
         .await
         .unwrap();
@@ -136,8 +137,12 @@ async fn delayed_matches_use_period_boundaries_and_device_team_snapshots() {
         assert_eq!(row["winner_player_id"], game.players[1].to_string());
         assert_eq!(row["player_a_draw_time_ms"], 0);
         assert_eq!(row["player_b_draw_time_ms"], 310);
-        let received: DateTime<Utc> = row["received_at"].as_str().unwrap().parse().unwrap();
-        assert!(received >= before && received <= after);
+        let received = row["received_at"]
+            .as_str()
+            .unwrap()
+            .parse::<Timestamp>()
+            .unwrap();
+        assert!(received >= before.to_jiff() && received <= after.to_jiff());
         if id <= 4 {
             assert_eq!(row["player_a_team_id"], game.teams[0].to_string());
             assert_eq!(row["player_b_team_id"], game.teams[1].to_string());
@@ -491,7 +496,7 @@ async fn invalid_fields_report_each_entry_and_request_errors_remain_atomic() {
             10 => report.player_b_draw_time_ms = Some(u64::MAX),
             11 => report.occurred_at_unix_ms = None,
             12 => report.occurred_at_unix_ms = Some(-1),
-            13 => report.occurred_at_unix_ms = Some(i64::MAX),
+            13 => report.occurred_at_unix_ms = Some(253_402_207_201_000),
             _ => report.winner_player_id = Some("invalid".into()),
         }
         reports.push(report);
@@ -531,7 +536,7 @@ async fn invalid_fields_report_each_entry_and_request_errors_remain_atomic() {
     .await;
     assert!(list(&app).await["matches"].as_array().unwrap().is_empty());
 
-    let mut report = game.report(1, 253_402_300_799_999);
+    let mut report = game.report(1, 253_402_207_200_999);
     report.player_a_draw_time_ms = Some(i64::MAX as u64);
     report.player_b_draw_time_ms = Some(i64::MAX as u64);
     assert_eq!(upload(&app, vec![report; 100]).await.status(), 204);
@@ -541,6 +546,18 @@ async fn invalid_fields_report_each_entry_and_request_errors_remain_atomic() {
     assert_eq!(saved["matches"][0]["player_b_draw_time_ms"], i64::MAX);
     assert_eq!(
         saved["matches"][0]["occurred_at"],
+        "9999-12-30T22:00:00.999Z"
+    );
+    // Rows written before the upload limit changed are still readable.
+    sqlx::query(
+        "UPDATE quickdraw_matches SET occurred_at = '9999-12-31T23:59:59.999Z' WHERE event_id = $1",
+    )
+    .bind(game.event)
+    .execute(&app.db_pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        list(&app).await["matches"][0]["occurred_at"],
         "9999-12-31T23:59:59.999Z"
     );
 }
@@ -643,7 +660,7 @@ async fn ingestion_waits_for_scoring_changes_and_reads_the_committed_period() {
         .await
         .unwrap();
     sqlx::query("UPDATE event_scoring_periods SET closes_at = $1 WHERE event_id = $2")
-        .bind(DateTime::from_timestamp_millis(2000).unwrap())
+        .bind(Timestamp::from_second(2).unwrap().to_sqlx())
         .bind(game.event)
         .execute(&mut *transaction)
         .await

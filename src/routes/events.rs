@@ -1,7 +1,7 @@
 use crate::routes::helpers::errors::database_error;
 use actix_web::{HttpResponse, error, web};
 use actix_web::{get, patch, post, put};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -37,7 +37,7 @@ struct EventResponse {
     id: Uuid,
     name: String,
     venue_name: Option<String>,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 fn validate_name(name: &str) -> actix_web::Result<()> {
@@ -68,7 +68,7 @@ fn validate_venue(venue: Option<&str>) -> actix_web::Result<()> {
 pub async fn list_events(pool: web::Data<PgPool>) -> actix_web::Result<HttpResponse> {
     let events = sqlx::query_as!(
         EventResponse,
-        "SELECT id, name, venue_name, created_at FROM events ORDER BY created_at DESC, id DESC"
+        "SELECT id, name, venue_name, created_at AS \"created_at: jiff_sqlx::Timestamp\" FROM events ORDER BY created_at DESC, id DESC"
     )
     .fetch_all(pool.get_ref())
     .await
@@ -94,11 +94,11 @@ pub async fn create_event(
     let event = sqlx::query_as!(
         EventResponse,
         "INSERT INTO events (id, name, venue_name, created_at) VALUES ($1, $2, $3, $4)
-         RETURNING id, name, venue_name, created_at",
+         RETURNING id, name, venue_name, created_at AS \"created_at: jiff_sqlx::Timestamp\"",
         Uuid::new_v4(),
         body.name.trim(),
         body.venue_name.as_deref(),
-        Utc::now()
+        jiff_sqlx::Timestamp::from(Timestamp::now()) as _
     )
     .fetch_one(pool.get_ref())
     .await
@@ -135,7 +135,7 @@ pub async fn update_event(
         EventResponse,
         "UPDATE events SET name = COALESCE($2, name),
          venue_name = CASE WHEN $3 THEN $4 ELSE venue_name END
-         WHERE id = $1 RETURNING id, name, venue_name, created_at",
+         WHERE id = $1 RETURNING id, name, venue_name, created_at AS \"created_at: jiff_sqlx::Timestamp\"",
         *id,
         body.name.as_deref().map(str::trim),
         body.venue_name.is_some(),

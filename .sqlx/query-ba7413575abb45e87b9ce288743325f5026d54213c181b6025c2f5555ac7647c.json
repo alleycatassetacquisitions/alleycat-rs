@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            id,\n            device_mac::text AS \"device_mac!\",\n            crash_number,\n            uptime_ms,\n            received_at,\n            software_version,\n            reset_reason,\n            program_counter,\n            exception_cause,\n            task_name\n        FROM device_logs\n        ORDER BY received_at DESC, id DESC\n        LIMIT $1 OFFSET $2\n        ",
+  "query": "\n        SELECT\n            id,\n            device_mac::text AS \"device_mac!\",\n            crash_number,\n            uptime_ms,\n            received_at AS \"received_at: jiff_sqlx::Timestamp\",\n            software_version,\n            reset_reason,\n            program_counter,\n            exception_cause,\n            task_name\n        FROM device_logs\n        ORDER BY received_at DESC, id DESC\n        LIMIT $1 OFFSET $2\n        ",
   "describe": {
     "columns": [
       {
@@ -25,7 +25,7 @@
       },
       {
         "ordinal": 4,
-        "name": "received_at",
+        "name": "received_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       },
       {
@@ -73,5 +73,5 @@
       true
     ]
   },
-  "hash": "80ea11b1b1fef84792dad67cfadc9397210c51a090eb1763b07c4f6d28cfa66f"
+  "hash": "ba7413575abb45e87b9ce288743325f5026d54213c181b6025c2f5555ac7647c"
 }

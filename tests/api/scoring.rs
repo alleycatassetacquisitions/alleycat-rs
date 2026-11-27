@@ -1,7 +1,8 @@
 //! Database-boundary tests for the scoring migrations. Runtime SQL here exercises
 //! constraints and the ingestion contract; scoring controls have separate API tests.
 use crate::helpers::spawn_app;
-use chrono::{DateTime, Duration, Utc};
+use jiff::{SignedDuration, Timestamp};
+use jiff_sqlx::ToSqlx;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -48,34 +49,34 @@ impl Game {
     }
 }
 
-fn start() -> DateTime<Utc> {
-    "2026-10-10T15:00:00Z".parse().unwrap()
+fn start() -> Timestamp {
+    "2026-10-10T15:00:00Z".parse::<Timestamp>().unwrap()
 }
 
 async fn add_period(
     pool: &PgPool,
     event: Uuid,
-    started_at: DateTime<Utc>,
-    closes_at: Option<DateTime<Utc>>,
+    started_at: Timestamp,
+    closes_at: Option<Timestamp>,
 ) -> Result<Uuid, sqlx::Error> {
     sqlx::query_scalar(
         "INSERT INTO event_scoring_periods (event_id, started_at, closes_at)
          VALUES ($1, $2, $3) RETURNING id",
     )
     .bind(event)
-    .bind(started_at)
-    .bind(closes_at)
+    .bind(started_at.to_sqlx())
+    .bind(closes_at.map(ToSqlx::to_sqlx))
     .fetch_one(pool)
     .await
 }
 
-async fn period_at(pool: &PgPool, event: Uuid, at: DateTime<Utc>) -> Option<Uuid> {
+async fn period_at(pool: &PgPool, event: Uuid, at: Timestamp) -> Option<Uuid> {
     sqlx::query_scalar(
         "SELECT id FROM event_scoring_periods
          WHERE event_id = $1 AND tstzrange(started_at, closes_at, '[)') @> $2::timestamptz",
     )
     .bind(event)
-    .bind(at)
+    .bind(at.to_sqlx())
     .fetch_optional(pool)
     .await
     .unwrap()
@@ -87,7 +88,7 @@ struct Match {
     players: [Uuid; 2],
     teams: [Option<Uuid>; 2],
     winner: Uuid,
-    occurred_at: DateTime<Utc>,
+    occurred_at: Timestamp,
     scoring_status: &'static str,
 }
 
@@ -99,7 +100,7 @@ impl Match {
             players: game.players,
             teams: game.teams.map(Some),
             winner: game.players[0],
-            occurred_at: start() + Duration::minutes(5),
+            occurred_at: start() + SignedDuration::from_mins(5),
             scoring_status,
         }
     }
@@ -120,7 +121,7 @@ impl Match {
         .bind(self.teams[0])
         .bind(self.teams[1])
         .bind(self.winner)
-        .bind(self.occurred_at)
+        .bind(self.occurred_at.to_sqlx())
         .bind(self.scoring_status)
         .execute(pool)
         .await
@@ -150,14 +151,14 @@ async fn scoring_periods_use_occurrence_time_and_include_only_the_opening_bounda
     let pool = &app.db_pool;
     let game = Game::create(pool).await;
     assert_eq!(period_at(pool, game.event, start()).await, None);
-    let close = start() + Duration::hours(1);
+    let close = start() + SignedDuration::from_hours(1);
     let first = add_period(pool, game.event, start(), Some(close))
         .await
         .unwrap();
     for (at, expected) in [
-        (start() - Duration::microseconds(1), None),
+        (start() - SignedDuration::from_micros(1), None),
         (start(), Some(first)),
-        (close - Duration::microseconds(1), Some(first)),
+        (close - SignedDuration::from_micros(1), Some(first)),
         (close, None),
     ] {
         assert_eq!(period_at(pool, game.event, at).await, expected);
@@ -172,17 +173,17 @@ async fn periods_reject_overlap_bad_times_and_allow_independent_events() {
     let pool = &app.db_pool;
     let game = Game::create(pool).await;
     let other = Game::create(pool).await;
-    let close = start() + Duration::hours(1);
+    let close = start() + SignedDuration::from_hours(1);
     let first = add_period(pool, game.event, start(), Some(close))
         .await
         .unwrap();
     for (open, end) in [
         (start(), None),
-        (start() - Duration::minutes(1), Some(close)),
-        (start() + Duration::minutes(1), Some(close)),
+        (start() - SignedDuration::from_mins(1), Some(close)),
+        (start() + SignedDuration::from_mins(1), Some(close)),
         (
-            start() - Duration::hours(1),
-            Some(close + Duration::hours(1)),
+            start() - SignedDuration::from_hours(1),
+            Some(close + SignedDuration::from_hours(1)),
         ),
     ] {
         assert_constraint(
@@ -190,7 +191,7 @@ async fn periods_reject_overlap_bad_times_and_allow_independent_events() {
             "event_scoring_periods_no_overlap",
         );
     }
-    for end in [start(), start() - Duration::seconds(1)] {
+    for end in [start(), start() - SignedDuration::from_secs(1)] {
         assert!(
             add_period(pool, other.event, start(), Some(end))
                 .await
@@ -224,7 +225,12 @@ async fn concurrent_opens_cannot_create_two_periods_for_one_event() {
     let game = Game::create(pool).await;
     let (a, b) = tokio::join!(
         add_period(pool, game.event, start(), None),
-        add_period(pool, game.event, start() + Duration::seconds(1), None)
+        add_period(
+            pool,
+            game.event,
+            start() + SignedDuration::from_secs(1),
+            None
+        )
     );
     let results = [a, b];
     assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
@@ -303,7 +309,7 @@ async fn explicit_scoring_decisions_preserve_history_and_must_agree_with_saved_t
         .await
         .unwrap();
     sqlx::query("UPDATE event_scoring_periods SET closes_at = $1 WHERE id = $2")
-        .bind(start() + Duration::hours(1))
+        .bind((start() + SignedDuration::from_hours(1)).to_sqlx())
         .bind(period)
         .execute(pool)
         .await
@@ -332,7 +338,7 @@ async fn first_upload_wins_despite_timestamp_variation_or_concurrent_retries() {
             .fetch_one(pool)
             .await
             .unwrap();
-    duel.occurred_at += Duration::milliseconds(5);
+    duel.occurred_at += SignedDuration::from_millis(5);
     duel.scoring_status = "scoring_disabled";
     let (a, b) = tokio::join!(duel.insert(pool), duel.insert(pool));
     assert_eq!((a.unwrap(), b.unwrap()), (0, 0));
@@ -349,13 +355,13 @@ async fn first_upload_wins_despite_timestamp_variation_or_concurrent_retries() {
     duel.id = a.id;
     let (first, second) = tokio::join!(a.insert(pool), duel.insert(pool));
     assert_eq!(first.unwrap() + second.unwrap(), 1);
-    let saved: DateTime<Utc> =
+    let saved: jiff_sqlx::Timestamp =
         sqlx::query_scalar("SELECT occurred_at FROM quickdraw_matches WHERE id = $1")
             .bind(a.id)
             .fetch_one(pool)
             .await
             .unwrap();
-    assert!(saved == occurred || saved == duel.occurred_at);
+    assert!(saved.to_jiff() == occurred || saved.to_jiff() == duel.occurred_at);
 }
 
 #[tokio::test]
@@ -364,25 +370,25 @@ async fn receipt_time_defaults_to_database_clock_and_survives_unrelated_updates(
     let pool = &app.db_pool;
     let game = Game::create(pool).await;
     let duel = Match::new(&game, "scoring_disabled");
-    let before: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
+    let before: jiff_sqlx::Timestamp = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(pool)
         .await
         .unwrap();
     // Ingestion omits received_at so PostgreSQL supplies its clock time.
     duel.insert(pool).await.unwrap();
-    let received: DateTime<Utc> =
+    let received: jiff_sqlx::Timestamp =
         sqlx::query_scalar("SELECT received_at FROM quickdraw_matches WHERE id = $1")
             .bind(duel.id)
             .fetch_one(pool)
             .await
             .unwrap();
-    let after: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
+    let after: jiff_sqlx::Timestamp = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(pool)
         .await
         .unwrap();
     assert!(received >= before && received <= after);
 
-    let (unchanged, draw_time): (DateTime<Utc>, i64) = sqlx::query_as(
+    let (unchanged, draw_time): (jiff_sqlx::Timestamp, i64) = sqlx::query_as(
         "UPDATE quickdraw_matches
          SET player_a_draw_time_ms = 250
          WHERE id = $1 RETURNING received_at, player_a_draw_time_ms",

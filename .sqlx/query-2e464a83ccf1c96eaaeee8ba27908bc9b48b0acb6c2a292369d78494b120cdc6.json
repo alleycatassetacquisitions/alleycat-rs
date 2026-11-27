@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (p.id IS NOT NULL) AS \"enabled!\", p.started_at AS \"started_at?: jiff_sqlx::Timestamp\"\n           FROM events e LEFT JOIN event_scoring_periods p\n             ON p.event_id = e.id AND p.closes_at IS NULL\n           WHERE e.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "enabled!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "started_at?: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "2e464a83ccf1c96eaaeee8ba27908bc9b48b0acb6c2a292369d78494b120cdc6"
+}

@@ -6,7 +6,7 @@ pub use get::*;
 pub use register::*;
 pub use update::*;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -18,7 +18,8 @@ pub(super) struct PlayerResponse {
     pub(super) pdn_code: String,
     pub(super) name: String,
     pub(super) email: Option<String>,
-    pub(super) created_at: DateTime<Utc>,
+    #[sqlx(try_from = "jiff_sqlx::Timestamp")]
+    pub(super) created_at: Timestamp,
     pub(super) team_id: Option<Uuid>,
     /// Current team name; null when unassigned.
     pub(super) team_name: Option<String>,

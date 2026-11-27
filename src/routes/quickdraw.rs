@@ -7,9 +7,10 @@ use crate::routes::helpers::{
     errors::database_error,
     pagination::{Pagination, PaginationQuery},
     protobuf::{self, ProtobufBody},
+    timestamp,
 };
 use actix_web::{HttpRequest, HttpResponse, error, get, post, web};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use prost::Message;
 use serde::Serialize;
 use sqlx::{Acquire, PgPool};
@@ -24,7 +25,7 @@ struct NewMatch {
     player_a_draw_time_ms: i64,
     player_b_draw_time_ms: i64,
     winner_player_id: Option<Uuid>,
-    occurred_at: DateTime<Utc>,
+    occurred_at: Timestamp,
 }
 
 impl NewMatch {
@@ -111,15 +112,12 @@ impl NewMatch {
                 QuickdrawMatchErrorCode::MissingField,
             )
         })?;
-        let occurred_at = Some(occurred_at_ms)
-            .filter(|ms| (0..=253_402_300_799_999).contains(ms))
-            .and_then(DateTime::from_timestamp_millis)
-            .ok_or_else(|| {
-                MatchValidationError::new(
-                    &["occurred_at_unix_ms"],
-                    QuickdrawMatchErrorCode::OutOfRange,
-                )
-            })?;
+        let occurred_at = timestamp::from_device_millis(occurred_at_ms).ok_or_else(|| {
+            MatchValidationError::new(
+                &["occurred_at_unix_ms"],
+                QuickdrawMatchErrorCode::OutOfRange,
+            )
+        })?;
         Ok(Self {
             id,
             player_a_id,
@@ -359,7 +357,7 @@ pub async fn write_quickdraw_matches(
             report.id, event_id, report.player_a_id, report.player_b_id,
             report.player_a_team_id, report.player_b_team_id,
             report.player_a_draw_time_ms, report.player_b_draw_time_ms,
-            report.winner_player_id, report.occurred_at,
+            report.winner_player_id, jiff_sqlx::Timestamp::from(report.occurred_at) as _,
         ).execute(&mut *entry).await;
         let inserted = match inserted {
             Ok(inserted) => inserted,
@@ -427,6 +425,24 @@ enum ScoringStatus {
     Tie,
 }
 
+// Older devices could submit times through the last millisecond of year 9999.
+#[derive(Serialize)]
+#[serde(untagged)]
+enum MatchTime {
+    Timestamp(Timestamp),
+    Legacy(String),
+}
+
+impl From<jiff_sqlx::DateTime> for MatchTime {
+    fn from(value: jiff_sqlx::DateTime) -> Self {
+        let utc = value.to_jiff();
+        match utc.to_zoned(jiff::tz::TimeZone::UTC) {
+            Ok(zoned) => Self::Timestamp(zoned.timestamp()),
+            Err(_) => Self::Legacy(format!("{utc}Z")),
+        }
+    }
+}
+
 #[derive(Serialize, utoipa::ToSchema)]
 struct MatchResponse {
     id: Uuid,
@@ -438,8 +454,9 @@ struct MatchResponse {
     player_a_draw_time_ms: i64,
     player_b_draw_time_ms: i64,
     winner_player_id: Option<Uuid>,
-    occurred_at: DateTime<Utc>,
-    received_at: DateTime<Utc>,
+    #[schema(value_type = String, format = DateTime)]
+    occurred_at: MatchTime,
+    received_at: Timestamp,
     scoring_status: ScoringStatus,
 }
 
@@ -474,7 +491,8 @@ pub async fn get_quickdraw_matches(
     let matches = sqlx::query_as!(
         MatchResponse,
         r#"SELECT id, event_id, player_a_id, player_b_id, player_a_team_id, player_b_team_id,
-           player_a_draw_time_ms, player_b_draw_time_ms, winner_player_id, occurred_at, received_at,
+           player_a_draw_time_ms, player_b_draw_time_ms, winner_player_id,
+           occurred_at AT TIME ZONE 'UTC' AS "occurred_at!: jiff_sqlx::DateTime", received_at AS "received_at: jiff_sqlx::Timestamp",
            scoring_status AS "scoring_status: ScoringStatus"
            FROM quickdraw_matches WHERE event_id = $1
            ORDER BY occurred_at DESC, id DESC LIMIT $2 OFFSET $3"#,

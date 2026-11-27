@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, event_id, player_a_id, player_b_id, player_a_team_id, player_b_team_id,\n           player_a_draw_time_ms, player_b_draw_time_ms, winner_player_id, occurred_at, received_at,\n           scoring_status AS \"scoring_status: ScoringStatus\"\n           FROM quickdraw_matches WHERE event_id = $1\n           ORDER BY occurred_at DESC, id DESC LIMIT $2 OFFSET $3",
+  "query": "SELECT id, event_id, player_a_id, player_b_id, player_a_team_id, player_b_team_id,\n           player_a_draw_time_ms, player_b_draw_time_ms, winner_player_id,\n           occurred_at AT TIME ZONE 'UTC' AS \"occurred_at!: jiff_sqlx::DateTime\", received_at AS \"received_at: jiff_sqlx::Timestamp\",\n           scoring_status AS \"scoring_status: ScoringStatus\"\n           FROM quickdraw_matches WHERE event_id = $1\n           ORDER BY occurred_at DESC, id DESC LIMIT $2 OFFSET $3",
   "describe": {
     "columns": [
       {
@@ -50,12 +50,12 @@
       },
       {
         "ordinal": 9,
-        "name": "occurred_at",
-        "type_info": "Timestamptz"
+        "name": "occurred_at!: jiff_sqlx::DateTime",
+        "type_info": "Timestamp"
       },
       {
         "ordinal": 10,
-        "name": "received_at",
+        "name": "received_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       },
       {
@@ -95,10 +95,10 @@
       false,
       false,
       true,
-      false,
+      null,
       false,
       false
     ]
   },
-  "hash": "86a0cb2785f37f691f27bb5e21154d1dcb430e357fa0348d4b9791410439b455"
+  "hash": "eed37cf7df142b13adae33e3aaf3236640da23f56496c870f58708efa67f46fa"
 }

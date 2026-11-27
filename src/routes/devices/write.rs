@@ -5,7 +5,7 @@ use crate::proto::alleycat::device::{
 use crate::routes::helpers::errors::database_error;
 use crate::routes::helpers::protobuf::{self, ProtobufBody};
 use actix_web::{HttpRequest, HttpResponse, error, post, web};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use sqlx::{PgConnection, PgPool, types::mac_address::MacAddress};
 use uuid::Uuid;
 
@@ -102,7 +102,7 @@ impl TryFrom<CreateDeviceRequest> for DeviceRegistration {
 
 struct NewInspection {
     id: Uuid,
-    inspected_at: DateTime<Utc>,
+    inspected_at: Timestamp,
     firmware_commit_hash: Option<String>,
     notes: Option<String>,
     powers_on: Option<bool>,
@@ -117,13 +117,13 @@ impl TryFrom<CreateDeviceInspectionRequest> for NewInspection {
         let ms = value
             .inspected_at_unix_ms
             .ok_or_else(|| error::ErrorBadRequest("inspected_at_unix_ms is required"))?;
-        if !(0..=253_402_300_799_999).contains(&ms) || ms > Utc::now().timestamp_millis() {
-            return Err(error::ErrorBadRequest(
-                "inspected_at_unix_ms must be between the Unix epoch and the current time",
-            ));
-        }
-        let inspected_at: DateTime<Utc> =
-            DateTime::from_timestamp_millis(ms).expect("validated timestamp range");
+        let inspected_at = crate::routes::helpers::timestamp::from_device_millis(ms)
+            .filter(|time| *time <= Timestamp::now())
+            .ok_or_else(|| {
+                error::ErrorBadRequest(
+                    "inspected_at_unix_ms must be between the Unix epoch and the current time",
+                )
+            })?;
         validate_text(
             value.firmware_commit_hash.as_deref(),
             "firmware_commit_hash",
@@ -197,13 +197,13 @@ async fn save_inspection(
     value: &NewInspection,
 ) -> actix_web::Result<()> {
     let id = value.id;
-    let inspected_at = value.inspected_at;
+    let inspected_at = jiff_sqlx::Timestamp::from(value.inspected_at);
     let checks = &value.checks;
     // The (id, device_kind) unique index must also accept concurrent retries.
     let inserted = sqlx::query_scalar!(
         "INSERT INTO device_inspections (id, device_id, device_kind, inspected_at, firmware_commit_hash, notes, powers_on)
          VALUES ($1, $2, 'pdn', $3, $4, $5, $6) ON CONFLICT DO NOTHING RETURNING id",
-        id, device_id, inspected_at, value.firmware_commit_hash.as_deref(), value.notes.as_deref(), value.powers_on
+        id, device_id, inspected_at as _, value.firmware_commit_hash.as_deref(), value.notes.as_deref(), value.powers_on
     ).fetch_optional(&mut *connection).await.map_err(write_error)?;
     if inserted.is_some() {
         sqlx::query!(
@@ -227,7 +227,7 @@ async fn save_inspection(
              AND output_jack IS NOT DISTINCT FROM $13
              AND housing IS NOT DISTINCT FROM $14
              AND powers_on IS NOT DISTINCT FROM $15) AS \"identical!\"",
-            id, device_id, inspected_at, value.firmware_commit_hash.as_deref(), value.notes.as_deref(),
+            id, device_id, inspected_at as _, value.firmware_commit_hash.as_deref(), value.notes.as_deref(),
             checks.screen, checks.primary_button, checks.secondary_button, checks.haptics, checks.leds, checks.power_switch, checks.input_jack, checks.output_jack, checks.housing, value.powers_on
         ).fetch_one(&mut *connection).await.map_err(write_error)?;
         if !identical {
@@ -418,7 +418,7 @@ mod tests {
             None,
             Some(-1),
             Some(i64::MAX),
-            Some(chrono::Utc::now().timestamp_millis() + 60_000),
+            Some((jiff::Timestamp::now().as_second() + 60) * 1000),
         ] {
             invalid.push(CreateDeviceInspectionRequest {
                 inspected_at_unix_ms: time,

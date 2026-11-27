@@ -5,7 +5,7 @@ pub use read::*;
 pub use write::*;
 
 use crate::proto::alleycat::device::PdnComponentChecks;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -16,7 +16,7 @@ pub(super) struct DeviceRecord {
     pub device_kind: String,
     pub hardware_version: Option<i32>,
     pub mac_address: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Observations from this inspection only; nothing carries forward from older checks.
@@ -36,8 +36,8 @@ pub(super) enum InspectionChecks {
 pub(super) struct Inspection {
     pub id: Uuid,
     pub device_id: Uuid,
-    pub inspected_at: DateTime<Utc>,
-    pub received_at: DateTime<Utc>,
+    pub inspected_at: Timestamp,
+    pub received_at: Timestamp,
     pub firmware_commit_hash: Option<String>,
     pub notes: Option<String>,
     pub checks: InspectionChecks,
@@ -46,8 +46,8 @@ pub(super) struct Inspection {
 pub(super) struct InspectionRow {
     pub id: Uuid,
     pub device_id: Uuid,
-    pub inspected_at: DateTime<Utc>,
-    pub received_at: DateTime<Utc>,
+    pub inspected_at: Timestamp,
+    pub received_at: Timestamp,
     pub firmware_commit_hash: Option<String>,
     pub notes: Option<String>,
     pub powers_on: Option<bool>,

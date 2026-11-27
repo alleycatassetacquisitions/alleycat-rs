@@ -7,6 +7,6 @@ publish = false
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
+jiff = "0.2"
 dotenvy = "0.15"
 url = "2"

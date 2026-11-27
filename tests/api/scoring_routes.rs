@@ -1,5 +1,5 @@
 use crate::helpers::{TestApp, assert_json, assert_text_error, spawn_app};
-use chrono::{DateTime, Utc};
+use jiff_sqlx::Timestamp;
 use reqwest::Method;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -25,7 +25,7 @@ async fn scoring_controls_preserve_history_and_retries_are_noops() {
     assert_eq!(set(&app, true).await, opened);
     assert_eq!(app.get(path).await.json::<Value>().await.unwrap(), opened);
     assert_eq!(set(&app, false).await, disabled);
-    let first: (Uuid, DateTime<Utc>, Option<DateTime<Utc>>) = sqlx::query_as(
+    let first: (Uuid, Timestamp, Option<Timestamp>) = sqlx::query_as(
         "SELECT id, started_at, closes_at FROM event_scoring_periods WHERE event_id = $1",
     )
     .bind(event)
@@ -35,7 +35,7 @@ async fn scoring_controls_preserve_history_and_retries_are_noops() {
     assert!(first.2.unwrap() > first.1);
     assert_eq!(set(&app, false).await, disabled);
     set(&app, true).await;
-    let periods: Vec<(Uuid, DateTime<Utc>, Option<DateTime<Utc>>)> = sqlx::query_as(
+    let periods: Vec<(Uuid, Timestamp, Option<Timestamp>)> = sqlx::query_as(
         "SELECT id, started_at, closes_at FROM event_scoring_periods WHERE event_id = $1 ORDER BY started_at",
     )
     .bind(event)
@@ -58,7 +58,7 @@ async fn concurrent_enable_and_disable_requests_are_idempotent() {
     let (a, b, c) = tokio::join!(set(&app, false), set(&app, false), set(&app, false),);
     assert_eq!(a, b);
     assert_eq!(b, c);
-    let periods: Vec<Option<DateTime<Utc>>> =
+    let periods: Vec<Option<Timestamp>> =
         sqlx::query_scalar("SELECT closes_at FROM event_scoring_periods WHERE event_id = $1")
             .bind(event)
             .fetch_all(&app.db_pool)
