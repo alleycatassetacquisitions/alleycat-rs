@@ -58,7 +58,7 @@ impl Drop for PartialBackup {
 pub fn backup(mut command: Command, args: BackupArgs) -> Result<PathBuf> {
     let directory = project_root()?.join(args.output);
     fs::create_dir_all(&directory).context("could not create backup directory")?;
-    let timestamp = chrono::Utc::now().format("%Y%m%dT%H%M%S%.9fZ").to_string();
+    let timestamp = jiff::Timestamp::now().strftime("%Y%m%dT%H%M%S%.9fZ");
     let path = directory.join(format!("alleycat-{timestamp}.sql"));
     let partial_path = path.with_extension("sql.partial");
     let mut options = OpenOptions::new();

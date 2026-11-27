@@ -1,23 +1,27 @@
 use crate::helpers::{assert_json, assert_text_error, spawn_app};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use reqwest::Method;
 use serde_json::{Value, json};
 
 #[tokio::test]
 async fn game_state_without_an_active_event_returns_null_settings_and_utc_time() {
     let app = spawn_app().await;
-    let before: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
+    let before: jiff_sqlx::Timestamp = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&app.db_pool)
         .await
         .unwrap();
     let response = app.get("/game-state").await;
     let state: Value = assert_json(response, 200).await;
-    let after: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
+    let after: jiff_sqlx::Timestamp = sqlx::query_scalar("SELECT clock_timestamp()")
         .fetch_one(&app.db_pool)
         .await
         .unwrap();
-    let time: DateTime<Utc> = state["server_time_utc"].as_str().unwrap().parse().unwrap();
-    assert!(time >= before && time <= after);
+    let time = state["server_time_utc"]
+        .as_str()
+        .unwrap()
+        .parse::<Timestamp>()
+        .unwrap();
+    assert!(time >= before.to_jiff() && time <= after.to_jiff());
     assert!(state["server_time_utc"].as_str().unwrap().ends_with('Z'));
     assert_eq!(state["active_event"], Value::Null);
     assert_eq!(state["scoring"], Value::Null);

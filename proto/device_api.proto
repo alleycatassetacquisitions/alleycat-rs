@@ -161,8 +161,8 @@ message QuickdrawMatch {
   // failure_reason is absent or blank. The server never infers the outcome from times.
   optional string winner_player_id = 8;
 
-  // Required UTC milliseconds since 1970-01-01; nonnegative, through year 9999.
-  // Maximum 253402300799999.
+  // Required UTC milliseconds since 1970-01-01 from 0 through
+  // 253402207200999 (9999-12-30T22:00:00.999Z).
   // The first accepted completed upload supplies the timestamp and all other fields.
   optional int64 occurred_at_unix_ms = 9;
 
@@ -217,7 +217,7 @@ message CreateDeviceInspectionRequest {
   // Generate once per check; retain this UUID and the same contents for retries.
   bytes id = 1;
   // Required check time: UTC milliseconds since 1970-01-01, from 0 through
-  // 253402300799999. Must not be in the future. Upload time is recorded separately.
+  // 253402207200999. Must not be in the future. Upload time is recorded separately.
   optional int64 inspected_at_unix_ms = 2;
   // Optional firmware identifier at check time. Nonblank, at most 64 UTF-8 bytes,
   // with no null characters. Stored unchanged.

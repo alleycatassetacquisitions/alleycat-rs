@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT i.id, i.device_id, i.inspected_at, i.received_at, i.firmware_commit_hash, i.notes, i.powers_on, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = $1\n         ORDER BY i.inspected_at DESC, i.received_at DESC, i.id DESC LIMIT $2 OFFSET $3",
+  "query": "SELECT i.id, i.device_id, i.inspected_at AS \"inspected_at: jiff_sqlx::Timestamp\", i.received_at AS \"received_at: jiff_sqlx::Timestamp\", i.firmware_commit_hash, i.notes, i.powers_on, p.screen, p.primary_button, p.secondary_button, p.haptics, p.leds, p.power_switch, p.input_jack, p.output_jack, p.housing FROM device_inspections i JOIN pdn_inspection_checks p ON p.inspection_id = i.id WHERE i.device_id = $1\n         ORDER BY i.inspected_at DESC, i.received_at DESC, i.id DESC LIMIT $2 OFFSET $3",
   "describe": {
     "columns": [
       {
@@ -15,12 +15,12 @@
       },
       {
         "ordinal": 2,
-        "name": "inspected_at",
+        "name": "inspected_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       },
       {
         "ordinal": 3,
-        "name": "received_at",
+        "name": "received_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       },
       {
@@ -110,5 +110,5 @@
       true
     ]
   },
-  "hash": "e7a6ac9606c86e9d5ca2be7392ce6e99c69bf7793f98c5ea11804b415b997883"
+  "hash": "1329b6acc1473dec13a15abb24cae8845a38c5d8d53f9f3a76e9f578a30a06f0"
 }

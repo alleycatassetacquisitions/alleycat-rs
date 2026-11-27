@@ -5,7 +5,7 @@ use crate::routes::helpers::{
     pagination::{Pagination, PaginationQuery},
 };
 use actix_web::{error, get, web};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -26,7 +26,7 @@ pub struct RawMatchReport {
     match_id: Option<Uuid>,
     /// Reporting MAC exactly as submitted, or null when absent or blank.
     mac_address: Option<String>,
-    received_at: DateTime<Utc>,
+    received_at: Timestamp,
     /// Accepted outcome: completed, tie or failed. Null means the entry was rejected.
     outcome: Option<String>,
     /// All known submitted fields, including invalid values, without normalization.
@@ -46,7 +46,7 @@ pub struct MatchReportSummary {
     report_count: i64,
     /// Distinct nonblank MAC strings, compared exactly.
     reporting_device_count: i64,
-    last_received_at: DateTime<Utc>,
+    last_received_at: Timestamp,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -96,7 +96,7 @@ pub async fn get_match_reports(
     let pagination = query.normalize();
     let (limit, offset) = pagination.limit_offset();
     let rows = sqlx::query!(
-        "SELECT id, event_id, match_id, mac_address, received_at, outcome,
+        "SELECT id, event_id, match_id, mac_address, received_at AS \"received_at: jiff_sqlx::Timestamp\", outcome,
         submitted_match_id, player_a_id, player_b_id, player_a_team_id, player_b_team_id,
         player_a_draw_time_ms::text AS player_a_draw_time_ms,
         player_b_draw_time_ms::text AS player_b_draw_time_ms,
@@ -132,7 +132,7 @@ pub async fn get_match_reports(
                 event_id: row.event_id,
                 match_id: row.match_id,
                 mac_address: row.mac_address,
-                received_at: row.received_at,
+                received_at: row.received_at.to_jiff(),
                 outcome: row.outcome,
                 report,
             })
@@ -157,7 +157,7 @@ async fn summaries(
     let matches = sqlx::query_as!(MatchReportSummary,
         r#"SELECT match_id AS "match_id!", COUNT(*) AS "report_count!",
             COUNT(DISTINCT mac_address) AS "reporting_device_count!",
-            MAX(received_at) AS "last_received_at!"
+            MAX(received_at) AS "last_received_at!: jiff_sqlx::Timestamp"
         FROM quickdraw_matches_raw WHERE event_id = $1 AND match_id IS NOT NULL
         GROUP BY match_id
         HAVING CASE $2::text

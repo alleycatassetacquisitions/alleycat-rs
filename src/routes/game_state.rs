@@ -2,7 +2,7 @@ use crate::events::lock_active_event;
 use crate::routes::helpers::errors::database_error;
 use crate::routes::scoring::ScoringState;
 use actix_web::{HttpResponse, error, get, put, web};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -12,7 +12,7 @@ struct ActiveEvent {
     id: Uuid,
     name: String,
     venue_name: Option<String>,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
@@ -24,7 +24,7 @@ struct GameState {
     /// Null when no event is selected. Independent of the current scoring switch.
     accepting_delayed_scores: Option<bool>,
     /// Database clock in UTC, sampled in the same statement as game status.
-    server_time_utc: DateTime<Utc>,
+    server_time_utc: Timestamp,
 }
 
 #[utoipa::path(
@@ -39,9 +39,9 @@ pub async fn get_game_state(pool: web::Data<PgPool>) -> actix_web::Result<HttpRe
     // clock cannot be null; all event columns are nullable because of the joins.
     let row = sqlx::query!(
         r#"SELECT e.id AS "id?", e.name AS "name?", e.venue_name,
-                  e.created_at AS "created_at?",
+                  e.created_at AS "created_at?: jiff_sqlx::Timestamp",
                   e.accepting_delayed_scores AS "accepting_delayed_scores?",
-                  p.started_at AS "started_at?", clock_timestamp() AS "server_time_utc!"
+                  p.started_at AS "started_at?: jiff_sqlx::Timestamp", clock_timestamp() AS "server_time_utc!: jiff_sqlx::Timestamp"
            FROM (SELECT 1) anchor
            LEFT JOIN app_state a ON a.id = 1
            LEFT JOIN events e ON e.id = a.active_event_id
@@ -55,19 +55,19 @@ pub async fn get_game_state(pool: web::Data<PgPool>) -> actix_web::Result<HttpRe
             id,
             name,
             venue_name: row.venue_name,
-            created_at,
+            created_at: created_at.to_jiff(),
         }),
         _ => None,
     };
     let scoring = active_event.as_ref().map(|_| ScoringState {
         enabled: row.started_at.is_some(),
-        started_at: row.started_at,
+        started_at: row.started_at.map(jiff_sqlx::Timestamp::to_jiff),
     });
     Ok(HttpResponse::Ok().json(GameState {
         active_event,
         scoring,
         accepting_delayed_scores: row.accepting_delayed_scores,
-        server_time_utc: row.server_time_utc,
+        server_time_utc: row.server_time_utc.to_jiff(),
     }))
 }
 

@@ -276,7 +276,7 @@ Generate once per check; retain this UUID and the same contents for retries. </p
                   <td><a href="#int64">int64</a></td>
                   <td>optional</td>
                   <td><p>Required check time: UTC milliseconds since 1970-01-01, from 0 through
-253402300799999. Must not be in the future. Upload time is recorded separately. </p></td>
+253402207200999. Must not be in the future. Upload time is recorded separately. </p></td>
                 </tr>
 
                 <tr>
@@ -628,8 +628,8 @@ failure_reason is absent or blank. The server never infers the outcome from time
                   <td>occurred_at_unix_ms</td>
                   <td><a href="#int64">int64</a></td>
                   <td>optional</td>
-                  <td><p>Required UTC milliseconds since 1970-01-01; nonnegative, through year 9999.
-Maximum 253402300799999.
+                  <td><p>Required UTC milliseconds since 1970-01-01 from 0 through
+253402207200999 (9999-12-30T22:00:00.999Z).
 The first accepted completed upload supplies the timestamp and all other fields. </p></td>
                 </tr>
 

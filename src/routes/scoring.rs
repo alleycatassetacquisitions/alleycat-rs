@@ -1,7 +1,7 @@
 use crate::events::{get_active_event_id, lock_active_event};
 use crate::routes::helpers::errors::database_error;
 use actix_web::{HttpResponse, error, get, put, web};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
@@ -15,7 +15,7 @@ pub struct SetScoring {
 pub(super) struct ScoringState {
     pub(super) enabled: bool,
     /// Inclusive start of the current period; null while scoring is disabled.
-    pub(super) started_at: Option<DateTime<Utc>>,
+    pub(super) started_at: Option<Timestamp>,
 }
 
 fn scoring_error(error: sqlx::Error) -> actix_web::Error {
@@ -37,9 +37,8 @@ pub async fn get_scoring(pool: web::Data<PgPool>) -> actix_web::Result<HttpRespo
         .await
         .map_err(scoring_error)?
         .ok_or_else(|| error::ErrorConflict("No active event"))?;
-    let state = sqlx::query_as!(
-        ScoringState,
-        r#"SELECT (p.id IS NOT NULL) AS "enabled!", p.started_at AS "started_at?"
+    let state = sqlx::query!(
+        r#"SELECT (p.id IS NOT NULL) AS "enabled!", p.started_at AS "started_at?: jiff_sqlx::Timestamp"
            FROM events e LEFT JOIN event_scoring_periods p
              ON p.event_id = e.id AND p.closes_at IS NULL
            WHERE e.id = $1"#,
@@ -48,7 +47,10 @@ pub async fn get_scoring(pool: web::Data<PgPool>) -> actix_web::Result<HttpRespo
     .fetch_one(pool.get_ref())
     .await
     .map_err(scoring_error)?;
-    Ok(HttpResponse::Ok().json(state))
+    Ok(HttpResponse::Ok().json(ScoringState {
+        enabled: state.enabled,
+        started_at: state.started_at.map(jiff_sqlx::Timestamp::to_jiff),
+    }))
 }
 
 #[utoipa::path(
@@ -80,7 +82,7 @@ pub async fn set_scoring(
         .map_err(scoring_error)?;
 
     let mut started_at = sqlx::query_scalar!(
-        "SELECT started_at FROM event_scoring_periods WHERE event_id = $1 AND closes_at IS NULL",
+        "SELECT started_at AS \"started_at: jiff_sqlx::Timestamp\" FROM event_scoring_periods WHERE event_id = $1 AND closes_at IS NULL",
         event_id
     )
     .fetch_optional(&mut *transaction)
@@ -94,7 +96,7 @@ pub async fn set_scoring(
                 "INSERT INTO event_scoring_periods (event_id, started_at)
              SELECT $1, GREATEST(clock_timestamp(), MAX(closes_at))
              FROM event_scoring_periods WHERE event_id = $1
-             RETURNING started_at",
+             RETURNING started_at AS \"started_at: jiff_sqlx::Timestamp\"",
                 event_id
             )
             .fetch_one(&mut *transaction)
@@ -116,6 +118,6 @@ pub async fn set_scoring(
     transaction.commit().await.map_err(scoring_error)?;
     Ok(HttpResponse::Ok().json(ScoringState {
         enabled: started_at.is_some(),
-        started_at,
+        started_at: started_at.map(jiff_sqlx::Timestamp::to_jiff),
     }))
 }

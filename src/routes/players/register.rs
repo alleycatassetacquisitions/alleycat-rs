@@ -4,7 +4,7 @@ use crate::events::lock_active_event;
 use crate::routes::helpers::errors::database_error;
 use actix_web::post;
 use actix_web::{HttpResponse, web};
-use chrono::Utc;
+use jiff::Timestamp;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -138,7 +138,7 @@ async fn insert_player(
     .bind(&code)
     .bind(new_player.name.as_ref())
     .bind(new_player.email.as_ref().map(|email| email.as_ref()))
-    .bind(Utc::now())
+    .bind(jiff_sqlx::Timestamp::from(Timestamp::now()))
     .fetch_one(&mut *transaction)
     .await?;
     sqlx::query!(

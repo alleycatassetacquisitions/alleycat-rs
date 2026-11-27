@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO event_scoring_periods (event_id, started_at)\n             SELECT $1, GREATEST(clock_timestamp(), MAX(closes_at))\n             FROM event_scoring_periods WHERE event_id = $1\n             RETURNING started_at AS \"started_at: jiff_sqlx::Timestamp\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "started_at: jiff_sqlx::Timestamp",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a3a85c6ae2b40d22984f3d0597e37097d3ca24d93f390f6ef08bbd9b10a2168c"
+}

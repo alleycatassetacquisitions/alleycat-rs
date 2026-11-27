@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, id_label, device_kind, hardware_version, mac_address::text AS mac_address, created_at\n         FROM devices ORDER BY id_label LIMIT $1 OFFSET $2",
+  "query": "SELECT id, id_label, device_kind, hardware_version, mac_address::text AS mac_address, created_at AS \"created_at: jiff_sqlx::Timestamp\" FROM devices WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -30,14 +30,13 @@
       },
       {
         "ordinal": 5,
-        "name": "created_at",
+        "name": "created_at: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Int8",
-        "Int8"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -49,5 +48,5 @@
       false
     ]
   },
-  "hash": "6c704664c05d6cba7b44b4d91d0c43636b2413cd7bb8461f35c3579dc8b56f97"
+  "hash": "ba8a2ad9e8aeb15b4a5667e73b09590d08668b935c32c6115f5e3315829b24c4"
 }

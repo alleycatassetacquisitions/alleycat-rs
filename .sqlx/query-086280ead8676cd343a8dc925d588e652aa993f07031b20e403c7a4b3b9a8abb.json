@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT e.id AS \"id?\", e.name AS \"name?\", e.venue_name,\n                  e.created_at AS \"created_at?\",\n                  e.accepting_delayed_scores AS \"accepting_delayed_scores?\",\n                  p.started_at AS \"started_at?\", clock_timestamp() AS \"server_time_utc!\"\n           FROM (SELECT 1) anchor\n           LEFT JOIN app_state a ON a.id = 1\n           LEFT JOIN events e ON e.id = a.active_event_id\n           LEFT JOIN event_scoring_periods p ON p.event_id = e.id AND p.closes_at IS NULL",
+  "query": "SELECT e.id AS \"id?\", e.name AS \"name?\", e.venue_name,\n                  e.created_at AS \"created_at?: jiff_sqlx::Timestamp\",\n                  e.accepting_delayed_scores AS \"accepting_delayed_scores?\",\n                  p.started_at AS \"started_at?: jiff_sqlx::Timestamp\", clock_timestamp() AS \"server_time_utc!: jiff_sqlx::Timestamp\"\n           FROM (SELECT 1) anchor\n           LEFT JOIN app_state a ON a.id = 1\n           LEFT JOIN events e ON e.id = a.active_event_id\n           LEFT JOIN event_scoring_periods p ON p.event_id = e.id AND p.closes_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -20,7 +20,7 @@
       },
       {
         "ordinal": 3,
-        "name": "created_at?",
+        "name": "created_at?: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       },
       {
@@ -30,12 +30,12 @@
       },
       {
         "ordinal": 5,
-        "name": "started_at?",
+        "name": "started_at?: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       },
       {
         "ordinal": 6,
-        "name": "server_time_utc!",
+        "name": "server_time_utc!: jiff_sqlx::Timestamp",
         "type_info": "Timestamptz"
       }
     ],
@@ -52,5 +52,5 @@
       null
     ]
   },
-  "hash": "ea2c23d91acb0109b90a2932c1c8515a633b203b45fc3bcff3f8d65268f8832e"
+  "hash": "086280ead8676cd343a8dc925d588e652aa993f07031b20e403c7a4b3b9a8abb"
 }

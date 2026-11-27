@@ -1,4 +1,6 @@
 use crate::helpers::{TestApp, assert_json, assert_text_error, spawn_app};
+use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use reqwest::Method;
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -25,7 +27,7 @@ async fn listing_events_orders_by_creation_time_then_id() {
         "id": Uuid::from_u128(1),
         "name": "Newest",
         "venue_name": "Main Hall",
-        "created_at": "2026-01-02T00:00:00Z"
+        "created_at": "2026-01-02T00:00:00.12Z"
     });
     let older_higher_id = json!({
         "id": Uuid::from_u128(3),
@@ -42,15 +44,18 @@ async fn listing_events_orders_by_creation_time_then_id() {
     // Insert out of order; the listing must establish its own order.
     for event in [&older_lower_id, &newest, &older_higher_id] {
         let id = Uuid::parse_str(event["id"].as_str().unwrap()).unwrap();
-        let created_at: chrono::DateTime<chrono::Utc> =
-            event["created_at"].as_str().unwrap().parse().unwrap();
+        let created_at = event["created_at"]
+            .as_str()
+            .unwrap()
+            .parse::<Timestamp>()
+            .unwrap();
         sqlx::query(
             "INSERT INTO events (id, name, venue_name, created_at) VALUES ($1, $2, $3, $4)",
         )
         .bind(id)
         .bind(event["name"].as_str().unwrap())
         .bind(event["venue_name"].as_str())
-        .bind(created_at)
+        .bind(created_at.to_sqlx())
         .execute(&app.db_pool)
         .await
         .unwrap();
