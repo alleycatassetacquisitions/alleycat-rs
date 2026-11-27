@@ -1,8 +1,18 @@
-# Reset verification
+# Check the database reset script
 
-With Docker running, `cargo xtask db check-reset` starts an isolated PostgreSQL 18 container,
-applies migrations, exercises `xtask/reset_remote_db.sql`, and checks that only
-application objects and a SQLx ledger sentinel disappear. Unrelated objects,
-data, and grants must survive, and migrations must apply again to produce the
-same database. Migration SQL is applied directly; the ledger sentinel tests
-table removal, not SQLx migration bookkeeping.
+Run this check after changing the [reset inventory](../../reset_remote_db.sql).
+With Docker running, execute the command from the repository root:
+
+```bash
+cargo xtask db check-reset
+```
+
+## What it verifies
+
+The command starts its own disposable PostgreSQL 18 container and checks that:
+
+- The reset script removes the application objects created by the migrations.
+- It also removes the SQLx migration history table. The check creates a stand-in
+  for that table because it runs the migration SQL directly.
+- Unrelated database objects, data, and grants survive the reset.
+- Applying all migrations again recreates the same schema.
