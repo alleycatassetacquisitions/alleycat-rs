@@ -1,4 +1,9 @@
-# Check the database reset script
+# Database tasks
+
+Use `cargo xtask db new <name>` to [create a migration](../../../docs/database-migrations.md#create-a-migration)
+from an edit to the root schema.
+
+## Check the database reset script
 
 Run this check after changing the [reset inventory](../../reset_remote_db.sql).
 With Docker running, execute the command from the repository root:
@@ -7,7 +12,7 @@ With Docker running, execute the command from the repository root:
 cargo xtask db check-reset
 ```
 
-## What it verifies
+### What it verifies
 
 The command starts its own disposable PostgreSQL 18 container and checks that:
 

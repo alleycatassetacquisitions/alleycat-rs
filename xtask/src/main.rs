@@ -21,7 +21,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Check database maintenance operations.
+    /// Create migrations and verify database maintenance operations.
     Db {
         #[command(subcommand)]
         command: db::Command,

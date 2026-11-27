@@ -12,18 +12,25 @@ use std::{
 
 #[derive(Subcommand)]
 pub enum Command {
+    /// Generate and verify a migration from the root schema.sql.
+    New {
+        name: String,
+        /// Tell Reylo which table or column was renamed (old=new).
+        #[arg(long, value_name = "OLD=NEW")]
+        rename: Vec<String>,
+    },
     /// Verify the reset inventory in a disposable PostgreSQL 18 database.
     CheckReset,
 }
 
 pub fn run(command: Command) -> Result<()> {
     match command {
+        Command::New { name, rename } => new_migration(&name, &rename),
         Command::CheckReset => check_reset(),
     }
 }
 
-// Drop cleans up after both success and ordinary error returns. No ports or volumes
-// are published, and this container never uses the application's credentials.
+// Remove the temporary database on success and on ordinary error returns.
 struct Database(String);
 impl Drop for Database {
     fn drop(&mut self) {
@@ -33,7 +40,7 @@ impl Drop for Database {
             .is_ok_and(|o| o.status.success())
         {
             eprintln!(
-                "Could not remove reset-check container {}; remove it with docker rm -f {}",
+                "Could not remove temporary database container {}; remove it with docker rm -f {}",
                 self.0, self.0
             );
         }
@@ -69,33 +76,23 @@ fn docker(args: &[&str], input: Option<&[u8]>) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn check_reset() -> Result<()> {
-    let root = project_root()?;
+fn start_database(connection_args: &[&str]) -> Result<Database> {
     let name = format!(
-        "alleycat-reset-check-{}-{}",
+        "alleycat-db-{}-{}",
         std::process::id(),
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     );
-    println!("Starting temporary PostgreSQL 18 for the reset inventory check...");
-    docker(
-        &[
-            "run",
-            "--detach",
-            "--rm",
-            "--name",
-            &name,
-            "--network",
-            "none",
-            "--env",
-            "POSTGRES_HOST_AUTH_METHOD=trust",
-            "--env",
-            "POSTGRES_DB=docs",
-            "--tmpfs",
-            "/var/lib/postgresql",
-            "postgres:18",
-        ],
-        None,
-    )?;
+    println!("Starting temporary PostgreSQL 18...");
+    let mut args = vec!["run", "--detach", "--rm", "--name", &name];
+    args.extend_from_slice(connection_args);
+    args.extend([
+        "--env",
+        "POSTGRES_DB=docs",
+        "--tmpfs",
+        "/var/lib/postgresql",
+        "postgres:18",
+    ]);
+    docker(&args, None)?;
     let db = Database(name);
     let start = Instant::now();
     loop {
@@ -124,6 +121,55 @@ fn check_reset() -> Result<()> {
         }
         thread::sleep(Duration::from_millis(250));
     }
+    Ok(db)
+}
+
+fn new_migration(name: &str, renames: &[String]) -> Result<()> {
+    if name.is_empty() || !name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_') {
+        bail!("Use letters, digits, and underscores for the migration name.");
+    }
+    let root = project_root()?;
+    let password = uuid::Uuid::new_v4();
+    let db = start_database(&[
+        "--publish",
+        "127.0.0.1::5432",
+        "--env",
+        &format!("POSTGRES_PASSWORD={password}"),
+    ])?;
+    let binding = docker(&["port", &db.0, "5432/tcp"], None)?;
+    let port: u16 = binding
+        .trim()
+        .strip_prefix("127.0.0.1:")
+        .context("expected a loopback PostgreSQL port")?
+        .parse()?;
+    let url = format!("postgresql://postgres:{password}@127.0.0.1:{port}/docs");
+    let mut generate = vec!["new", name];
+    for rename in renames {
+        generate.extend(["--rename", rename.as_str()]);
+    }
+    for args in [generate.as_slice(), &["dev"], &["status"]] {
+        let status = Process::new("reylo")
+            .current_dir(root)
+            .env("DATABASE_URL", &url)
+            .arg("migrate")
+            .args(args)
+            .status()
+            .context("could not run reylo; install the Reylo CLI and put it on PATH")?;
+        if !status.success() {
+            bail!("reylo migrate {} failed with {status}", args[0]);
+        }
+    }
+    Ok(())
+}
+
+fn check_reset() -> Result<()> {
+    let root = project_root()?;
+    let db = start_database(&[
+        "--network",
+        "none",
+        "--env",
+        "POSTGRES_HOST_AUTH_METHOD=trust",
+    ])?;
     let mut migrations = fs::read_dir(root.join("migrations"))?
         .map(|entry| entry.map(|e| e.path()))
         .collect::<std::io::Result<Vec<_>>>()?;
