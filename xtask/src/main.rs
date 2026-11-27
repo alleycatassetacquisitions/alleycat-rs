@@ -1,6 +1,7 @@
 mod cloud;
 mod command;
 mod database;
+mod db;
 mod docs;
 mod env;
 mod native;
@@ -20,7 +21,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Generate documentation from the repository's migrations.
+    /// Check database maintenance operations.
+    Db {
+        #[command(subcommand)]
+        command: db::Command,
+    },
+    /// Generate the device API documentation.
     Docs {
         #[command(subcommand)]
         command: docs::Command,
@@ -51,6 +57,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Command::Db { command } => db::run(command),
         Command::Docs { command } => docs::run(command),
         Command::Native { command } => native::run(command),
         Command::Stack { command } => stack::run(command),

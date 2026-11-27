@@ -21,7 +21,7 @@ database. The status check verifies the database, migration files, and lock agre
 
 ## Reset verification
 
-With Docker running, `cargo xtask docs check-reset` starts an isolated PostgreSQL 18 container,
+With Docker running, `cargo xtask db check-reset` starts an isolated PostgreSQL 18 container,
 applies migrations, exercises `xtask/reset_remote_db.sql`, and checks that only
 application objects and a SQLx ledger sentinel disappear. Unrelated objects,
 data, and grants must survive, and migrations must apply again to produce the

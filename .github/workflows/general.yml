@@ -65,7 +65,7 @@ jobs:
           "$RUNNER_TEMP/reylo" migrate status
 
       - name: Check database reset inventory
-        run: cargo xtask docs check-reset
+        run: cargo xtask db check-reset
 
       - name: Check generated device API docs
         run: cargo xtask docs proto --check
