@@ -91,7 +91,7 @@
   otherwise.
 - Edit the root `schema.sql` for schema changes. Commit the matching migration
   and Reylo-generated `reylo.lock`. Follow the database checks in
-  [database maintenance](xtask/src/db/README.md).
+  [the migration guide](docs/database-migrations.md).
 - `cargo xtask cloud db reset` resets the
   disposable DigitalOcean database using `xtask/reset_remote_db.sql`, by
   explicitly dropping every application schema object created by `migrations/`,
