@@ -19,28 +19,14 @@ pub enum Command {
         #[arg(long)]
         check: bool,
     },
-    /// Export schema.sql using a disposable PostgreSQL 18 container.
-    Db {
-        /// Output directory, relative to the repository root unless absolute.
-        #[arg(long, default_value = "docs/database")]
-        output: PathBuf,
-        /// Check that schema.sql matches the migrations without rewriting it.
-        #[arg(long)]
-        check: bool,
-        /// Verify the reset inventory in a second, freshly created container database.
-        #[arg(long)]
-        check_reset: bool,
-    },
+    /// Verify the reset inventory in a disposable PostgreSQL 18 database.
+    CheckReset,
 }
 
 pub fn run(command: Command) -> Result<()> {
     match command {
         Command::Proto { check } => proto::generate(check),
-        Command::Db {
-            output,
-            check,
-            check_reset,
-        } => generate(output, check, check_reset),
+        Command::CheckReset => check_reset(),
     }
 }
 
@@ -91,15 +77,14 @@ fn docker(args: &[&str], input: Option<&[u8]>) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn generate(output: PathBuf, check: bool, check_reset: bool) -> Result<()> {
+fn check_reset() -> Result<()> {
     let root = project_root()?;
-    let output = root.join(output);
     let name = format!(
         "alleycat-docs-{}-{}",
         std::process::id(),
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     );
-    println!("Starting temporary PostgreSQL 18 for database documentation...");
+    println!("Starting temporary PostgreSQL 18 for the reset inventory check...");
     docker(
         &[
             "run",
@@ -160,26 +145,7 @@ fn generate(output: PathBuf, check: bool, check_reset: bool) -> Result<()> {
     // Match the dev database: migrations may create objects in public, but
     // cannot install trusted extensions using database-level CREATE privileges.
     db.sql("docs", b"CREATE ROLE app_migrator NOLOGIN")?;
-    db.migrate("docs", &migrations)?;
-    let schema = db.dump("docs", true)?;
-    if check_reset {
-        db.check_reset(&migrations)?;
-    }
-    let schema_path = output.join("schema.sql");
-    if check {
-        if fs::read(&schema_path).ok().as_deref() != Some(schema.as_bytes()) {
-            bail!(
-                "Database documentation is stale or missing: {}. Run cargo xtask docs db (with the same --output, if specified) and commit the updated schema.sql.",
-                schema_path.display()
-            );
-        }
-        println!("Database schema snapshot is up to date.");
-    } else {
-        fs::create_dir_all(&output)?;
-        fs::write(&schema_path, schema)?;
-        println!("Generated {}", schema_path.display());
-    }
-    Ok(())
+    db.check_reset(&migrations)
 }
 
 impl Database {

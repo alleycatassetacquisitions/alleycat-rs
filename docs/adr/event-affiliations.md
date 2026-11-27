@@ -20,5 +20,5 @@ between groups after reassignment.
 
 - [Catalog API](../../src/routes/affiliations.rs)
 - [Player assignment API](../../src/routes/players/update.rs)
-- [Database reference](../database/schema.sql)
+- [Database reference](../../schema.sql)
 - [Event API scope](event-api-scope.md)

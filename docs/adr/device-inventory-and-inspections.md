@@ -23,5 +23,5 @@ Share component definitions only when their meaning and validation match.
 
 - [Protobuf contract](../../proto/device_api.proto)
 - [Device HTTP contracts](../../src/routes/devices/)
-- [SQL schema](../database/schema.sql)
+- [SQL schema](../../schema.sql)
 - [Database backup and recovery](../database-backups.md)

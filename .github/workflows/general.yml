@@ -49,8 +49,23 @@ jobs:
           cargo test -p xtask
           cargo test -p xtask whole_database_recovery -- --ignored --nocapture
 
-      - name: Check SQL schema snapshot and reset inventory
-        run: cargo xtask docs db --check --check-reset
+      - name: Verify root schema against locked migrations
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          DATABASE_URL: postgres://postgres:password@127.0.0.1:5432/reylo_verify
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSLO https://github.com/reylosql/reylo/releases/download/v0.9.0/reylo-linux-x64.tar.gz
+          echo 'f573882ac608e7b46bcb01304d6e329c8b419efccf7fc571209c18f8915cdb95  reylo-linux-x64.tar.gz' | sha256sum --check
+          tar -xzf reylo-linux-x64.tar.gz reylo
+          cd "$GITHUB_WORKSPACE"
+          docker exec "$POSTGRES_CONTAINER" createdb -U postgres reylo_verify
+          "$RUNNER_TEMP/reylo" migrate deploy --dry-run
+          "$RUNNER_TEMP/reylo" migrate deploy
+          "$RUNNER_TEMP/reylo" migrate status
+
+      - name: Check database reset inventory
+        run: cargo xtask docs check-reset
 
       - name: Check generated device API docs
         run: cargo xtask docs proto --check

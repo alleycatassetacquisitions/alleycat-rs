@@ -1,36 +1,27 @@
 # Documentation maintenance
 
-The database reference is a PostgreSQL schema dump generated from the migrations.
+## Database schema
 
-## Generate and check
+Edit the [root schema.sql](../../../schema.sql) when changing the database. Commit it
+with the corresponding migration and updated `reylo.lock`.
 
-From the repository root, with Docker running:
-
-```bash
-cargo xtask docs db
-```
-
-Run the same consistency checks as CI without rewriting generated files:
+To run the CI schema checks locally, set `DATABASE_URL` to a fresh disposable
+PostgreSQL 18 database. Use a direct connection with permission to create shadow
+databases. From the repository root, run Reylo 0.9.0:
 
 ```bash
-cargo xtask docs db --check --check-reset
+reylo migrate deploy --dry-run
+reylo migrate deploy
+reylo migrate status
 ```
 
-The command starts a disposable PostgreSQL 18 container with no external network,
-published ports, or persistent volumes.
-Migrations run as a role with `USAGE` and `CREATE` on the `public` schema, but
-without superuser or database-level `CREATE` privileges. This also checks that
-fresh installation works with the restricted App Platform dev database role.
-
-## Generated output
-
-Commit the regenerated [SQL snapshot](../../../docs/database/schema.sql) alongside migration changes.
-Use `--output PATH` to write `schema.sql` to another directory. Use `--check`
-to compare the snapshot there with a fresh dump without rewriting it.
+The dry run replays the migrations on a shadow database and compares the result
+with the root schema. Deployment applies the locked migrations to the disposable
+database. The status check verifies the database, migration files, and lock agree.
 
 ## Reset verification
 
-`--check-reset` creates another fresh database in the disposable container,
+With Docker running, `cargo xtask docs check-reset` starts an isolated PostgreSQL 18 container,
 applies migrations, exercises `xtask/reset_remote_db.sql`, and checks that only
 application objects and a SQLx ledger sentinel disappear. Unrelated objects,
 data, and grants must survive, and migrations must apply again to produce the
