@@ -28,4 +28,4 @@ and server time describe the same instant.
 - [Game state contract](../../src/routes/game_state.rs)
 - [Ingestion and scoring tests](../../tests/api/quickdraw.rs)
 - [Scoring-period database constraints](scoring-period-constraints.md)
-- [SQL schema](../database/schema.sql)
+- [SQL schema](../../schema.sql)

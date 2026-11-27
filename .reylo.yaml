@@ -1,0 +1,2 @@
+dir: .
+direct_url: ${DATABASE_URL}

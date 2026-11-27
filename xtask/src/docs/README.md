@@ -1,43 +1,4 @@
-# Documentation maintenance
-
-The database reference is a PostgreSQL schema dump generated from the migrations.
-
-## Generate and check
-
-From the repository root, with Docker running:
-
-```bash
-cargo xtask docs db
-```
-
-Run the same consistency checks as CI without rewriting generated files:
-
-```bash
-cargo xtask docs db --check --check-reset
-```
-
-The command starts a disposable PostgreSQL 18 container with no external network,
-published ports, or persistent volumes.
-Migrations run as a role with `USAGE` and `CREATE` on the `public` schema, but
-without superuser or database-level `CREATE` privileges. This also checks that
-fresh installation works with the restricted App Platform dev database role.
-
-## Generated output
-
-Commit the regenerated [SQL snapshot](../../../docs/database/schema.sql) alongside migration changes.
-Use `--output PATH` to write `schema.sql` to another directory. Use `--check`
-to compare the snapshot there with a fresh dump without rewriting it.
-
-## Reset verification
-
-`--check-reset` creates another fresh database in the disposable container,
-applies migrations, exercises `xtask/reset_remote_db.sql`, and checks that only
-application objects and a SQLx ledger sentinel disappear. Unrelated objects,
-data, and grants must survive, and migrations must apply again to produce the
-same database. Migration SQL is applied directly; the ledger sentinel tests
-table removal, not SQLx migration bookkeeping.
-
-## Device API documentation
+# Device API documentation
 
 Edit the definitions and comments under `proto/`, then run with Docker running:
 

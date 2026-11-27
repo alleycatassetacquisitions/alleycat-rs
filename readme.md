@@ -90,9 +90,9 @@ For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/R
 
 ## Database documentation
 
-The [SQL schema](docs/database/schema.sql) shows the PostgreSQL definitions produced by the migrations.
+The [root schema.sql](schema.sql) defines the database. CI verifies that the migrations produce this schema.
 
-For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/README.md).
+See [Create a migration](docs/database-migrations.md) for the contributor workflow and local checks.
 
 ## Architecture decisions
 

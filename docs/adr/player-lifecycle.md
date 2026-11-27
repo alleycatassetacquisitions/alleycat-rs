@@ -14,5 +14,5 @@ would require agreed gameplay rules and a history of status changes.
 ## References
 
 - [Player routes and contracts](../../src/routes/players/)
-- [SQL schema](../database/schema.sql)
+- [SQL schema](../../schema.sql)
 - [Event affiliations](event-affiliations.md)

@@ -49,8 +49,11 @@ jobs:
           cargo test -p xtask
           cargo test -p xtask whole_database_recovery -- --ignored --nocapture
 
-      - name: Check SQL schema snapshot and reset inventory
-        run: cargo xtask docs db --check --check-reset
+      - name: Verify root schema against locked migrations
+        run: cargo xtask db verify
+
+      - name: Check database reset inventory
+        run: cargo xtask db check-reset
 
       - name: Check generated device API docs
         run: cargo xtask docs proto --check

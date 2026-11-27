@@ -1,0 +1,34 @@
+# On a conflict, keep main's and run reylo migrate dev
+version: 1
+schema: 3cdc2765
+migrations:
+  - name: 20260606015250_create_subscriptions_table.sql
+    checksum: 94c8c75a
+  - name: 20260727001504_create_device_logs_table.sql
+    checksum: de4b5663
+  - name: 20260927134449_create_events.sql
+    checksum: 44c79ecf
+  - name: 20260927140000_rename_player_mode_to_team.sql
+    checksum: ade692ec
+  - name: 20260927150000_create_event_teams.sql
+    checksum: 3314cb99
+  - name: 20261011120000_create_event_scoring_periods.sql
+    checksum: b05bef11
+  - name: 20261011121000_create_quickdraw_matches.sql
+    checksum: a7fa98f5
+  - name: 20261015070000_add_delayed_score_control.sql
+    checksum: a57584a9
+  - name: 20261015071000_add_player_active_status.sql
+    checksum: bb85ad51
+  - name: 20261017080000_create_event_affiliations.sql
+    checksum: 0d6ea822
+  - name: 20261020000000_add_category_device_visibility.sql
+    checksum: 4054f0d7
+  - name: 20261028000000_create_device_inventory.sql
+    checksum: 0d8bf0df
+  - name: 20261030000000_add_inspection_powers_on.sql
+    checksum: 5c64663c
+  - name: 20261114000000_retain_raw_quickdraw_reports.sql
+    checksum: fad621f1
+  - name: 20261125000000_remove_stored_schema_comments.sql
+    checksum: 73a1bf49

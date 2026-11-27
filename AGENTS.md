@@ -59,7 +59,7 @@
   explicit user instruction changing a decision authorizes updating it; otherwise
   resolve the conflict before changing the decision. Do not invent missing rationale
   or treat incidental implementation details as permanent requirements.
-- Keep API contracts in OpenAPI and schema details in generated database docs;
+- Keep API contracts in OpenAPI and schema details in the root `schema.sql`;
   link to them from ADRs instead of duplicating reference documentation.
 
 ## Old codebase
@@ -89,9 +89,9 @@
 - Before release, revisit this policy. From release onward, schema changes must
   use forward migrations that preserve existing data unless explicitly agreed
   otherwise.
-- Whenever a migration is added or changed, run `cargo xtask docs db` with
-  Docker running and include any regenerated changes to
-  `docs/database/schema.sql` in the same change. Do not edit this snapshot manually.
+- Edit the root `schema.sql` for schema changes. Commit the matching migration
+  and Reylo-generated `reylo.lock`. Follow the database checks in
+  [the migration guide](docs/database-migrations.md).
 - `cargo xtask cloud db reset` resets the
   disposable DigitalOcean database using `xtask/reset_remote_db.sql`, by
   explicitly dropping every application schema object created by `migrations/`,
