@@ -21,28 +21,42 @@ If the change adds, removes, or renames a table, view, sequence, routine, or
 custom type, update [the reset inventory](../xtask/reset_remote_db.sql) and run
 [the reset check](../xtask/src/db/README.md#check-the-database-reset-script).
 
-## Correct a column name
+## Correct a migration
 
-If you just generated the latest migration on your branch and want to change
-`venue_notes` to `venue_docs` before merging:
+First, fetch `origin/main` and check whether it contains the migration file.
+Once a migration reaches `main`, its SQL and filename are permanent.
 
-1. Change the column name in `schema.sql`.
-2. Remove the newly generated `*_add_event_venue_notes.sql` file from
-   `migrations/`. Restore `reylo.lock` to its state immediately before that
-   migration. If the previous lock was committed and the new migration is
-   uncommitted, use `git restore --source=HEAD -- reylo.lock`.
-3. Run `cargo xtask db new add_event_venue_docs`. Review the SQL and updated lock.
-   If you applied the old version to a separate disposable app database, rebuild
-   that database before using the revised migration.
+### Replace the latest migration on your branch
 
-If the original migration has reached `main`, keep it. Change the column name
-in `schema.sql` and generate a follow-up migration:
+If the migration is the last one on your branch and has never reached `main`,
+you can regenerate it, even if you already committed it locally.
+
+1. Edit `schema.sql` to describe the intended result.
+2. Remove the migration file you are replacing. Restore `reylo.lock` to the
+   version that covers the migrations you kept. If the migration is uncommitted
+   and the lock was clean before generation, use
+   `git restore --source=HEAD -- reylo.lock`. For a committed migration, use
+   the commit immediately before it was added as the restore source.
+3. Run `cargo xtask db new <name>` with a name that describes the corrected
+   change. Review the generated SQL, especially any bootstrap SQL or data
+   updates you added by hand. Carry those forward if they are still needed.
+4. Review and commit the replacement file, the removal of the old file,
+   `schema.sql`, and `reylo.lock` together. If your disposable app database
+   already ran the old migration, rebuild it before applying the replacement.
+
+### Add a follow-up migration
+
+If the migration is on `main`, keep it and [create a migration](#create-a-migration)
+for the correction. A follow-up is also the simplest option when later migrations
+on your branch depend on the original. Start from the current lock, edit
+`schema.sql`, and run `cargo xtask db new <name>`.
+
+For a table or column rename, pass `--rename OLD=NEW` so Reylo can preserve
+existing values. For example, to rename a column:
 
 ```bash
 cargo xtask db new rename_event_venue_notes --rename events.venue_notes=events.venue_docs
 ```
-
-The rename hint tells Reylo to generate a column rename that preserves existing values.
 
 ## Verify the committed migrations
 
