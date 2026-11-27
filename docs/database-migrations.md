@@ -1,8 +1,23 @@
 # Database migrations
 
+## Install the Reylo CLI
+
+On macOS or Linux, install the version used by CI once on your machine:
+
+```sh
+curl -fsSL https://reylo.dev/install.sh | REYLO_VERSION=0.9.0 sh
+export PATH="$HOME/.local/bin:$PATH"
+reylo --version
+```
+
+Check that the output reports `0.9.0`. If your shell does not already include
+`~/.local/bin` on its `PATH`, add the export line to your shell profile so
+`cargo xtask` can find Reylo in future sessions. For Windows, see the
+[Reylo CLI installation instructions](https://reylo.dev/cli).
+
 ## Create a migration
 
-Start Docker and make sure the Reylo 0.9.0 CLI is on your `PATH`.
+Start Docker before running the command.
 
 1. Edit the [root schema.sql](../schema.sql) to describe the change.
 2. From the repository root, run `cargo xtask db new <name>`. For example, after
