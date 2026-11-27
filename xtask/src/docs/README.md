@@ -1,34 +1,4 @@
-# Documentation maintenance
-
-## Database schema
-
-Edit the [root schema.sql](../../../schema.sql) when changing the database. Commit it
-with the corresponding migration and updated `reylo.lock`.
-
-To run the CI schema checks locally, set `DATABASE_URL` to a fresh disposable
-PostgreSQL 18 database. Use a direct connection with permission to create shadow
-databases. From the repository root, run Reylo 0.9.0:
-
-```bash
-reylo migrate deploy --dry-run
-reylo migrate deploy
-reylo migrate status
-```
-
-The dry run replays the migrations on a shadow database and compares the result
-with the root schema. Deployment applies the locked migrations to the disposable
-database. The status check verifies the database, migration files, and lock agree.
-
-## Reset verification
-
-With Docker running, `cargo xtask db check-reset` starts an isolated PostgreSQL 18 container,
-applies migrations, exercises `xtask/reset_remote_db.sql`, and checks that only
-application objects and a SQLx ledger sentinel disappear. Unrelated objects,
-data, and grants must survive, and migrations must apply again to produce the
-same database. Migration SQL is applied directly; the ledger sentinel tests
-table removal, not SQLx migration bookkeeping.
-
-## Device API documentation
+# Device API documentation
 
 Edit the definitions and comments under `proto/`, then run with Docker running:
 

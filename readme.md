@@ -92,7 +92,7 @@ For regeneration and CI checks, see [documentation maintenance](xtask/src/docs/R
 
 The [root schema.sql](schema.sql) defines the database. CI verifies that the migrations produce this schema.
 
-For local verification and CI checks, see [documentation maintenance](xtask/src/docs/README.md).
+For local verification and CI checks, see [database maintenance](xtask/src/db/README.md).
 
 ## Architecture decisions
 

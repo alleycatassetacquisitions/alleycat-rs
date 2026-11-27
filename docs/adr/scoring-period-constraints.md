@@ -22,4 +22,4 @@ revisit that if scoring-history volume makes writes expensive.
 - [Scoring-period migration](../../migrations/20261011120000_create_event_scoring_periods.sql)
 - [SQL schema](../../schema.sql)
 - [Database-boundary tests](../../tests/api/scoring.rs)
-- [Documentation and reset checks](../../xtask/src/docs/README.md)
+- [Schema and reset checks](../../xtask/src/db/README.md)
