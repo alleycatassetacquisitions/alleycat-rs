@@ -1,23 +1,9 @@
 # Database migrations
 
-## Install the Reylo CLI
-
-On macOS or Linux, install the version used by CI once on your machine:
-
-```sh
-curl -fsSL https://reylo.dev/install.sh | REYLO_VERSION=0.9.0 sh
-export PATH="$HOME/.local/bin:$PATH"
-reylo --version
-```
-
-Check that the output reports `0.9.0`. If your shell does not already include
-`~/.local/bin` on its `PATH`, add the export line to your shell profile so
-`cargo xtask` can find Reylo in future sessions. For Windows, see the
-[Reylo CLI installation instructions](https://reylo.dev/cli).
-
 ## Create a migration
 
-Start Docker before running the command.
+Start Docker. The xtask runs Reylo 0.9.0 and PostgreSQL 18 in containers.
+Docker downloads the images on first use.
 
 1. Edit the [root schema.sql](../schema.sql) to describe the change.
 2. From the repository root, run `cargo xtask db new <name>`. For example, after
@@ -75,16 +61,12 @@ cargo xtask db new rename_event_venue_notes --rename events.venue_notes=events.v
 
 ## Verify the committed migrations
 
-To run the CI schema checks locally, set `DATABASE_URL` to a fresh disposable
-PostgreSQL 18 database. Use a direct connection with permission to create shadow
-databases. From the repository root, run Reylo 0.9.0:
+With Docker running, use the same command as CI:
 
 ```bash
-reylo migrate deploy --dry-run
-reylo migrate deploy
-reylo migrate status
+cargo xtask db verify
 ```
 
-The dry run replays the migrations on a shadow database and compares the result
-with the root schema. Deployment applies the locked migrations to the disposable
-database. The status check verifies the database, migration files, and lock agree.
+Reylo checks the migration plan against the root schema, applies the locked
+migrations to a fresh database, and verifies their status. The checkout is
+mounted read-only for this check.

@@ -1,7 +1,8 @@
 # Database tasks
 
 Use `cargo xtask db new <name>` to [create a migration](../../../docs/database-migrations.md#create-a-migration)
-from an edit to the root schema.
+from an edit to the root schema. Run `cargo xtask db verify` to check committed
+migrations. Both commands run Reylo and PostgreSQL through Docker.
 
 ## Check the database reset script
 

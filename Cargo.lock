@@ -4437,7 +4437,6 @@ dependencies = [
  "clap",
  "dotenvy",
  "url",
- "uuid",
 ]
 
 [[package]]

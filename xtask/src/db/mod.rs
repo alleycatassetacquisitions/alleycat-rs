@@ -10,6 +10,8 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+const REYLO_IMAGE: &str = "ghcr.io/reylosql/reylo:0.9.0@sha256:bd3c88bc331d66c15dfaf358898657b09deb2f9f2ea24d45063d5380bc8cdeb7";
+
 #[derive(Subcommand)]
 pub enum Command {
     /// Generate and verify a migration from the root schema.sql.
@@ -19,6 +21,8 @@ pub enum Command {
         #[arg(long, value_name = "OLD=NEW")]
         rename: Vec<String>,
     },
+    /// Replay the locked migrations and verify the root schema.sql.
+    Verify,
     /// Verify the reset inventory in a disposable PostgreSQL 18 database.
     CheckReset,
 }
@@ -26,6 +30,7 @@ pub enum Command {
 pub fn run(command: Command) -> Result<()> {
     match command {
         Command::New { name, rename } => new_migration(&name, &rename),
+        Command::Verify => run_reylo(&[&["deploy", "--dry-run"], &["deploy"], &["status"]], true),
         Command::CheckReset => check_reset(),
     }
 }
@@ -76,22 +81,29 @@ fn docker(args: &[&str], input: Option<&[u8]>) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn start_database(connection_args: &[&str]) -> Result<Database> {
+fn start_database() -> Result<Database> {
     let name = format!(
         "alleycat-db-{}-{}",
         std::process::id(),
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     );
     println!("Starting temporary PostgreSQL 18...");
-    let mut args = vec!["run", "--detach", "--rm", "--name", &name];
-    args.extend_from_slice(connection_args);
-    args.extend([
+    let args = [
+        "run",
+        "--detach",
+        "--rm",
+        "--name",
+        &name,
+        "--network",
+        "none",
+        "--env",
+        "POSTGRES_HOST_AUTH_METHOD=trust",
         "--env",
         "POSTGRES_DB=docs",
         "--tmpfs",
         "/var/lib/postgresql",
         "postgres:18",
-    ]);
+    ];
     docker(&args, None)?;
     let db = Database(name);
     let start = Instant::now();
@@ -128,33 +140,42 @@ fn new_migration(name: &str, renames: &[String]) -> Result<()> {
     if name.is_empty() || !name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_') {
         bail!("Use letters, digits, and underscores for the migration name.");
     }
-    let root = project_root()?;
-    let password = uuid::Uuid::new_v4();
-    let db = start_database(&[
-        "--publish",
-        "127.0.0.1::5432",
-        "--env",
-        &format!("POSTGRES_PASSWORD={password}"),
-    ])?;
-    let binding = docker(&["port", &db.0, "5432/tcp"], None)?;
-    let port: u16 = binding
-        .trim()
-        .strip_prefix("127.0.0.1:")
-        .context("expected a loopback PostgreSQL port")?
-        .parse()?;
-    let url = format!("postgresql://postgres:{password}@127.0.0.1:{port}/docs");
     let mut generate = vec!["new", name];
     for rename in renames {
         generate.extend(["--rename", rename.as_str()]);
     }
-    for args in [generate.as_slice(), &["dev"], &["status"]] {
-        let status = Process::new("reylo")
-            .current_dir(root)
-            .env("DATABASE_URL", &url)
-            .arg("migrate")
-            .args(args)
+    run_reylo(&[&generate, &["dev"], &["status"]], false)
+}
+
+fn run_reylo(commands: &[&[&str]], read_only: bool) -> Result<()> {
+    let root = project_root()?;
+    let db = start_database()?;
+    let network = format!("container:{}", db.0);
+    let mode = if read_only { "ro" } else { "rw" };
+    let mount = format!("{}:/work:{mode}", root.display());
+    for args in commands {
+        let mut command = Process::new("docker");
+        command.args([
+            "run",
+            "--rm",
+            "--network",
+            &network,
+            "--volume",
+            &mount,
+            "--env",
+            "DATABASE_URL=postgresql://postgres@127.0.0.1:5432/docs",
+        ]);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let owner = fs::metadata(root.join("migrations"))?;
+            command.args(["--user", &format!("{}:{}", owner.uid(), owner.gid())]);
+        }
+        let status = command
+            .args([REYLO_IMAGE, "migrate"])
+            .args(*args)
             .status()
-            .context("could not run reylo; install the Reylo CLI and put it on PATH")?;
+            .context("could not run the Reylo Docker image")?;
         if !status.success() {
             bail!("reylo migrate {} failed with {status}", args[0]);
         }
@@ -164,12 +185,7 @@ fn new_migration(name: &str, renames: &[String]) -> Result<()> {
 
 fn check_reset() -> Result<()> {
     let root = project_root()?;
-    let db = start_database(&[
-        "--network",
-        "none",
-        "--env",
-        "POSTGRES_HOST_AUTH_METHOD=trust",
-    ])?;
+    let db = start_database()?;
     let mut migrations = fs::read_dir(root.join("migrations"))?
         .map(|entry| entry.map(|e| e.path()))
         .collect::<std::io::Result<Vec<_>>>()?;
